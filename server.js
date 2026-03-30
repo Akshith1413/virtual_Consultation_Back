@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -224,9 +224,9 @@ const seedCommunities = async () => {
     await Group.deleteMany({});
     
     await Group.insertMany(initialGroups);
-    console.log('✅ Realistic communities seeded successfully');
+    console.log('âœ… Realistic communities seeded successfully');
   } catch (err) {
-    console.error('❌ Seeding error:', err);
+    console.error('âŒ Seeding error:', err);
   }
 };
 
@@ -666,7 +666,7 @@ const InteractionWarningSchema = new mongoose.Schema({
 
 const InteractionWarning = mongoose.model('InteractionWarning', InteractionWarningSchema);
 
-// User Session Schema — tracks every login for contextual greetings
+// User Session Schema â€” tracks every login for contextual greetings
 const UserSessionSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   loginTimestamp: { type: Date, default: Date.now },
@@ -675,7 +675,7 @@ const UserSessionSchema = new mongoose.Schema({
 UserSessionSchema.index({ userId: 1, loginTimestamp: -1 });
 const UserSession = mongoose.model('UserSession', UserSessionSchema);
 
-// Meal Log Schema — quick meal check-ins
+// Meal Log Schema â€” quick meal check-ins
 const MealLogSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   mealType: { type: String, enum: ['breakfast', 'lunch', 'dinner', 'snack'], required: true },
@@ -685,7 +685,7 @@ const MealLogSchema = new mongoose.Schema({
 MealLogSchema.index({ userId: 1, loggedAt: -1 });
 const MealLog = mongoose.model('MealLog', MealLogSchema);
 
-// Hydration Profile Schema — bottle size, daily goal, reminder prefs
+// Hydration Profile Schema â€” bottle size, daily goal, reminder prefs
 const HydrationProfileSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
   bottleSizeMl: { type: Number, default: 500 },
@@ -2971,7 +2971,7 @@ app.get('/api/check-reminders', authenticate, async (req, res) => {
     const weightDaysSince = lastWeight ? Math.floor((now - new Date(lastWeight.recordedAt)) / (1000 * 60 * 60 * 24)) : 999;
     const weightDismissedToday = lastWeightDismissal && (now - new Date(lastWeightDismissal.dismissedAt)) < 24 * 60 * 60 * 1000;
     if (weightDaysSince >= 7 && !weightDismissedToday) {
-      reminders.push({ type: 'weight', priority: 1, message: `It's been ${weightDaysSince} days! Time to check your weight 🎯`, daysSince: weightDaysSince, icon: 'scale' });
+      reminders.push({ type: 'weight', priority: 1, message: `It's been ${weightDaysSince} days! Time to check your weight ðŸŽ¯`, daysSince: weightDaysSince, icon: 'scale' });
     }
 
     // Check water - daily (if not logged today)
@@ -2979,7 +2979,7 @@ app.get('/api/check-reminders', authenticate, async (req, res) => {
     const todayWater = await WaterIntakeLog.findOne({ userId: req.user._id, timestamp: { $gte: todayStart } });
     const waterDismissedToday = await ReminderDismissal.findOne({ userId: req.user._id, reminderType: 'water', dismissedAt: { $gte: todayStart } });
     if (!todayWater && !waterDismissedToday) {
-      reminders.push({ type: 'water', priority: 2, message: "You haven't logged any water today! 💧", icon: 'droplet' });
+      reminders.push({ type: 'water', priority: 2, message: "You haven't logged any water today! ðŸ’§", icon: 'droplet' });
     }
 
     // Check sleep - every 3 days
@@ -2987,7 +2987,7 @@ app.get('/api/check-reminders', authenticate, async (req, res) => {
     const sleepDaysSince = lastSleep ? Math.floor((now - new Date(lastSleep.recordedAt)) / (1000 * 60 * 60 * 24)) : 999;
     const sleepDismissedToday = await ReminderDismissal.findOne({ userId: req.user._id, reminderType: 'sleep', dismissedAt: { $gte: todayStart } });
     if (sleepDaysSince >= 3 && !sleepDismissedToday) {
-      reminders.push({ type: 'sleep', priority: 3, message: `How's your sleep? Last logged ${sleepDaysSince} days ago 🌙`, daysSince: sleepDaysSince, icon: 'moon' });
+      reminders.push({ type: 'sleep', priority: 3, message: `How's your sleep? Last logged ${sleepDaysSince} days ago ðŸŒ™`, daysSince: sleepDaysSince, icon: 'moon' });
     }
 
     // Check mood - daily
@@ -2995,7 +2995,7 @@ app.get('/api/check-reminders', authenticate, async (req, res) => {
     const moodLoggedToday = lastMood && new Date(lastMood.recordedAt) >= todayStart;
     const moodDismissedToday = await ReminderDismissal.findOne({ userId: req.user._id, reminderType: 'mood', dismissedAt: { $gte: todayStart } });
     if (!moodLoggedToday && !moodDismissedToday) {
-      reminders.push({ type: 'mood', priority: 4, message: "How are you feeling today? 😊", icon: 'smile' });
+      reminders.push({ type: 'mood', priority: 4, message: "How are you feeling today? ðŸ˜Š", icon: 'smile' });
     }
 
     // Sort by priority
@@ -3208,7 +3208,7 @@ function getDosesPerDay(frequency) {
 // SESSION & CONTEXT ROUTES (LifePulse)
 // ===================
 
-// POST /api/sessions/checkin — log a session when user opens dashboard
+// POST /api/sessions/checkin â€” log a session when user opens dashboard
 app.post('/api/sessions/checkin', authenticate, async (req, res) => {
   try {
     const session = new UserSession({ userId: req.user._id, loginTimestamp: new Date(), device: req.body.device || 'web' });
@@ -3220,7 +3220,7 @@ app.post('/api/sessions/checkin', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/sessions/context — returns contextual data for LifePulse
+// GET /api/sessions/context â€” returns contextual data for LifePulse
 app.get('/api/sessions/context', authenticate, async (req, res) => {
   try {
     const now = new Date();
@@ -3240,27 +3240,27 @@ app.get('/api/sessions/context', authenticate, async (req, res) => {
     let greetingType, expectedMeal, greetingEmoji, mealQuestion;
     if (hour >= 5 && hour < 11) {
       greetingType = 'morning';
-      greetingEmoji = '☀️';
+      greetingEmoji = 'â˜€ï¸';
       expectedMeal = 'breakfast';
       mealQuestion = 'Had your breakfast yet?';
     } else if (hour >= 11 && hour < 14) {
       greetingType = 'midday';
-      greetingEmoji = '🍽️';
+      greetingEmoji = 'ðŸ½ï¸';
       expectedMeal = 'lunch';
       mealQuestion = 'Lunch time! Did you eat?';
     } else if (hour >= 14 && hour < 17) {
       greetingType = 'afternoon';
-      greetingEmoji = '☕';
+      greetingEmoji = 'â˜•';
       expectedMeal = null;
       mealQuestion = 'Staying hydrated this afternoon?';
     } else if (hour >= 17 && hour < 21) {
       greetingType = 'evening';
-      greetingEmoji = '🌆';
+      greetingEmoji = 'ðŸŒ†';
       expectedMeal = 'dinner';
       mealQuestion = 'Had your dinner?';
     } else {
       greetingType = 'night';
-      greetingEmoji = '🌙';
+      greetingEmoji = 'ðŸŒ™';
       expectedMeal = null;
       mealQuestion = 'Time to wind down and rest!';
     }
@@ -3286,7 +3286,7 @@ app.get('/api/sessions/context', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/meals/log — quick-log a meal
+// POST /api/meals/log â€” quick-log a meal
 app.post('/api/meals/log', authenticate, async (req, res) => {
   try {
     const { mealType, skipped } = req.body;
@@ -3300,7 +3300,7 @@ app.post('/api/meals/log', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/meals/today — today's meal status
+// GET /api/meals/today â€” today's meal status
 app.get('/api/meals/today', authenticate, async (req, res) => {
   try {
     const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
@@ -3318,7 +3318,7 @@ app.get('/api/meals/today', authenticate, async (req, res) => {
 // HYDRATION PROFILE ROUTES
 // ===================
 
-// PUT /api/hydration-profile — save/update hydration preferences
+// PUT /api/hydration-profile â€” save/update hydration preferences
 app.put('/api/hydration-profile', authenticate, async (req, res) => {
   try {
     const { bottleSizeMl, dailyGoalMl, reminderIntervalMin, wakeTime, sleepTime } = req.body;
@@ -3334,7 +3334,7 @@ app.put('/api/hydration-profile', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/hydration-profile — get hydration settings
+// GET /api/hydration-profile â€” get hydration settings
 app.get('/api/hydration-profile', authenticate, async (req, res) => {
   try {
     let profile = await HydrationProfile.findOne({ userId: req.user._id });
@@ -3351,7 +3351,7 @@ app.get('/api/hydration-profile', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/water-intake/smart-schedule — research-backed next drink time + tips
+// GET /api/water-intake/smart-schedule â€” research-backed next drink time + tips
 app.get('/api/water-intake/smart-schedule', authenticate, async (req, res) => {
   try {
     const profile = await HydrationProfile.findOne({ userId: req.user._id });
@@ -3410,7 +3410,7 @@ app.get('/api/water-intake/smart-schedule', authenticate, async (req, res) => {
 // LIFE METRICS ANALYTICS ROUTES
 // ===================
 
-// GET /api/health-metrics/sleep-summary — weekly sleep stats
+// GET /api/health-metrics/sleep-summary â€” weekly sleep stats
 app.get('/api/health-metrics/sleep-summary', authenticate, async (req, res) => {
   try {
     const sevenDaysAgo = new Date();
@@ -3438,7 +3438,7 @@ app.get('/api/health-metrics/sleep-summary', authenticate, async (req, res) => {
   }
 });
 
-// GET /api/health-metrics/energy-pattern — energy across time of day
+// GET /api/health-metrics/energy-pattern â€” energy across time of day
 app.get('/api/health-metrics/energy-pattern', authenticate, async (req, res) => {
   try {
     const thirtyDaysAgo = new Date();
@@ -3474,7 +3474,7 @@ app.get('/api/health-metrics/energy-pattern', authenticate, async (req, res) => 
   }
 });
 
-// GET /api/health-metrics/mood-calendar — 30-day mood heatmap
+// GET /api/health-metrics/mood-calendar â€” 30-day mood heatmap
 app.get('/api/health-metrics/mood-calendar', authenticate, async (req, res) => {
   try {
     const thirtyDaysAgo = new Date();
@@ -3522,7 +3522,6 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 }); 
- 
  
  
  
