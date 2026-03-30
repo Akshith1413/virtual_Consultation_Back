@@ -1,19 +1,19 @@
-/**
+﻿/**
  * Medical Knowledge Base
  * Comprehensive healthcare data for AI features
  * Sources: WHO, NIH, Mayo Clinic, FDA, PubMed
  */
 
-// ─── DRUG/SUPPLEMENT INTERACTIONS DATABASE ────────────────────────
+// â”€â”€â”€ DRUG/SUPPLEMENT INTERACTIONS DATABASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SUPPLEMENT_INTERACTIONS = [
   // Vitamin interactions
   { pair: ['Vitamin K', 'Warfarin'], severity: 'Severe', description: 'Vitamin K counteracts Warfarin\'s blood-thinning effect', recommendation: 'Monitor INR closely. Consult doctor before taking Vitamin K supplements.' },
   { pair: ['Vitamin E', 'Warfarin'], severity: 'Severe', description: 'Vitamin E may increase bleeding risk when combined with Warfarin', recommendation: 'Limit Vitamin E to under 400 IU/day. Monitor for unusual bleeding.' },
-  { pair: ['Vitamin C', 'Iron'], severity: 'Mild', description: 'Vitamin C enhances iron absorption — this is a beneficial interaction', recommendation: 'Take together for better iron absorption. Good combination.' },
-  { pair: ['Vitamin D', 'Calcium'], severity: 'Mild', description: 'Vitamin D enhances calcium absorption — beneficial interaction', recommendation: 'Take together for better calcium uptake. Recommended combination.' },
+  { pair: ['Vitamin C', 'Iron'], severity: 'Mild', description: 'Vitamin C enhances iron absorption â€” this is a beneficial interaction', recommendation: 'Take together for better iron absorption. Good combination.' },
+  { pair: ['Vitamin D', 'Calcium'], severity: 'Mild', description: 'Vitamin D enhances calcium absorption â€” beneficial interaction', recommendation: 'Take together for better calcium uptake. Recommended combination.' },
   { pair: ['Vitamin B6', 'Levodopa'], severity: 'Severe', description: 'Vitamin B6 can reduce the effectiveness of Levodopa for Parkinson\'s', recommendation: 'Avoid high-dose B6 supplements. Consult neurologist.' },
   { pair: ['Vitamin A', 'Retinoids'], severity: 'Severe', description: 'Combining may cause Vitamin A toxicity (hypervitaminosis A)', recommendation: 'Do not supplement Vitamin A while on retinoid therapy.' },
-  { pair: ['Vitamin E', 'Aspirin'], severity: 'Moderate', description: 'Both thin the blood — increased bleeding risk', recommendation: 'Monitor for bruising and bleeding. Take at least 2 hours apart.' },
+  { pair: ['Vitamin E', 'Aspirin'], severity: 'Moderate', description: 'Both thin the blood â€” increased bleeding risk', recommendation: 'Monitor for bruising and bleeding. Take at least 2 hours apart.' },
 
   // Mineral interactions
   { pair: ['Calcium', 'Iron'], severity: 'Moderate', description: 'Calcium inhibits iron absorption by 50-60%', recommendation: 'Take at least 2 hours apart for optimal absorption.' },
@@ -25,10 +25,10 @@ const SUPPLEMENT_INTERACTIONS = [
   { pair: ['Potassium', 'ACE Inhibitors'], severity: 'Severe', description: 'Can cause dangerously high potassium levels (hyperkalemia)', recommendation: 'Monitor potassium levels regularly. Consult cardiologist.' },
 
   // Herbal interactions
-  { pair: ['St. John\'s Wort', 'Antidepressants'], severity: 'Severe', description: 'Can cause serotonin syndrome — potentially life-threatening', recommendation: 'Never combine. Stop St. John\'s Wort 2 weeks before starting antidepressants.' },
+  { pair: ['St. John\'s Wort', 'Antidepressants'], severity: 'Severe', description: 'Can cause serotonin syndrome â€” potentially life-threatening', recommendation: 'Never combine. Stop St. John\'s Wort 2 weeks before starting antidepressants.' },
   { pair: ['St. John\'s Wort', 'Birth Control'], severity: 'Severe', description: 'Reduces effectiveness of oral contraceptives', recommendation: 'Use alternative contraception. Consult doctor.' },
   { pair: ['St. John\'s Wort', 'Warfarin'], severity: 'Severe', description: 'Reduces Warfarin effectiveness, increasing clot risk', recommendation: 'Avoid combination. Consult hematologist.' },
-  { pair: ['Ginkgo Biloba', 'Blood Thinners'], severity: 'Severe', description: 'Ginkgo has blood-thinning properties — doubles bleeding risk', recommendation: 'Stop ginkgo 36 hours before surgery. Monitor for bleeding.' },
+  { pair: ['Ginkgo Biloba', 'Blood Thinners'], severity: 'Severe', description: 'Ginkgo has blood-thinning properties â€” doubles bleeding risk', recommendation: 'Stop ginkgo 36 hours before surgery. Monitor for bleeding.' },
   { pair: ['Ginkgo Biloba', 'Aspirin'], severity: 'Moderate', description: 'Increased bleeding risk from combined antiplatelet effects', recommendation: 'Monitor for unusual bruising or bleeding.' },
   { pair: ['Garlic', 'Blood Thinners'], severity: 'Moderate', description: 'Garlic has mild anticoagulant properties', recommendation: 'Moderate garlic supplement use. Monitor INR if on warfarin.' },
   { pair: ['Ginseng', 'Diabetes medication'], severity: 'Moderate', description: 'Ginseng may lower blood sugar, compounding diabetes medication effects', recommendation: 'Monitor blood sugar closely. Adjust medication if needed.' },
@@ -41,7 +41,7 @@ const SUPPLEMENT_INTERACTIONS = [
   { pair: ['Melatonin', 'Blood Pressure medication'], severity: 'Moderate', description: 'Melatonin can affect blood pressure regulation', recommendation: 'Monitor blood pressure. Take melatonin at bedtime only.' },
   { pair: ['Fish Oil', 'Blood Thinners'], severity: 'Moderate', description: 'Omega-3s have mild blood-thinning properties', recommendation: 'Limit to 2g/day of omega-3 with blood thinners. Monitor bleeding.' },
   { pair: ['Probiotics', 'Antibiotics'], severity: 'Mild', description: 'Antibiotics may kill probiotic bacteria', recommendation: 'Take probiotics 2-3 hours after antibiotics. Continue probiotics after course ends.' },
-  { pair: ['CoQ10', 'Statins'], severity: 'Mild', description: 'Statins reduce CoQ10 levels — supplementing is beneficial', recommendation: 'CoQ10 supplementation is recommended with statin therapy.' },
+  { pair: ['CoQ10', 'Statins'], severity: 'Mild', description: 'Statins reduce CoQ10 levels â€” supplementing is beneficial', recommendation: 'CoQ10 supplementation is recommended with statin therapy.' },
   { pair: ['CoQ10', 'Blood Thinners'], severity: 'Moderate', description: 'CoQ10 may reduce blood thinner effectiveness', recommendation: 'Monitor INR closely. Consult doctor.' },
 
   // Common medication interactions
@@ -53,7 +53,7 @@ const SUPPLEMENT_INTERACTIONS = [
   { pair: ['Biotin', 'Lab Tests'], severity: 'Moderate', description: 'High biotin can falsify thyroid, cardiac, and hormone lab results', recommendation: 'Stop biotin 72 hours before blood tests.' },
 ];
 
-// ─── SYMPTOM → CONDITION MAPPING ──────────────────────────────────
+// â”€â”€â”€ SYMPTOM â†’ CONDITION MAPPING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SYMPTOM_CONDITIONS = [
   {
     symptoms: ['headache', 'fever', 'body ache', 'fatigue', 'chills'],
@@ -67,14 +67,14 @@ const SYMPTOM_CONDITIONS = [
     condition: 'Meningitis',
     urgency: 'emergency',
     specialty: 'Neurology',
-    description: 'Inflammation of brain and spinal cord membranes — seek immediate care'
+    description: 'Inflammation of brain and spinal cord membranes â€” seek immediate care'
   },
   {
     symptoms: ['chest pain', 'shortness of breath', 'sweating', 'nausea', 'arm pain'],
     condition: 'Possible Heart Attack',
     urgency: 'emergency',
     specialty: 'Cardiology',
-    description: 'Potential cardiac emergency — call emergency services immediately'
+    description: 'Potential cardiac emergency â€” call emergency services immediately'
   },
   {
     symptoms: ['chest pain', 'shortness of breath', 'cough', 'fever'],
@@ -95,7 +95,7 @@ const SYMPTOM_CONDITIONS = [
     condition: 'Arthritis',
     urgency: 'low',
     specialty: 'Orthopedics',
-    description: 'Joint inflammation — consult for proper diagnosis and management'
+    description: 'Joint inflammation â€” consult for proper diagnosis and management'
   },
   {
     symptoms: ['persistent sadness', 'loss of interest', 'sleep changes', 'fatigue', 'difficulty concentrating'],
@@ -109,7 +109,7 @@ const SYMPTOM_CONDITIONS = [
     condition: 'Generalized Anxiety Disorder',
     urgency: 'medium',
     specialty: 'Psychiatry',
-    description: 'Anxiety disorder — treatable with therapy and/or medication'
+    description: 'Anxiety disorder â€” treatable with therapy and/or medication'
   },
   {
     symptoms: ['abdominal pain', 'bloating', 'diarrhea', 'constipation', 'gas'],
@@ -123,14 +123,14 @@ const SYMPTOM_CONDITIONS = [
     condition: 'Appendicitis',
     urgency: 'high',
     specialty: 'Surgery',
-    description: 'Inflammation of appendix — may require surgical intervention'
+    description: 'Inflammation of appendix â€” may require surgical intervention'
   },
   {
     symptoms: ['rash', 'itching', 'redness', 'dry skin', 'swelling'],
     condition: 'Dermatitis / Eczema',
     urgency: 'low',
     specialty: 'Dermatology',
-    description: 'Skin inflammation — manageable with proper treatment'
+    description: 'Skin inflammation â€” manageable with proper treatment'
   },
   {
     symptoms: ['back pain', 'leg numbness', 'tingling', 'weakness', 'difficulty walking'],
@@ -144,14 +144,14 @@ const SYMPTOM_CONDITIONS = [
     condition: 'Asthma',
     urgency: 'medium',
     specialty: 'General Practice',
-    description: 'Chronic airway inflammation — requires ongoing management'
+    description: 'Chronic airway inflammation â€” requires ongoing management'
   },
   {
     symptoms: ['sore throat', 'difficulty swallowing', 'fever', 'swollen lymph nodes'],
     condition: 'Pharyngitis / Tonsillitis',
     urgency: 'low',
     specialty: 'General Practice',
-    description: 'Throat infection — may be viral or bacterial'
+    description: 'Throat infection â€” may be viral or bacterial'
   },
   {
     symptoms: ['burning urination', 'frequent urination', 'pelvic pain', 'cloudy urine'],
@@ -207,11 +207,11 @@ const SYMPTOM_CONDITIONS = [
     condition: 'Glaucoma',
     urgency: 'high',
     specialty: 'General Practice',
-    description: 'Eye condition with increased intraocular pressure — needs prompt treatment'
+    description: 'Eye condition with increased intraocular pressure â€” needs prompt treatment'
   },
 ];
 
-// ─── SYMPTOM → SPECIALTY ROUTING ──────────────────────────────────
+// â”€â”€â”€ SYMPTOM â†’ SPECIALTY ROUTING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SPECIALTY_ROUTING = {
   'General Practice': ['fever', 'cold', 'cough', 'flu', 'fatigue', 'general pain', 'sore throat', 'ear pain', 'minor injury'],
   'Cardiology': ['chest pain', 'heart palpitations', 'rapid heartbeat', 'shortness of breath', 'high blood pressure', 'swollen legs', 'dizziness with exertion'],
@@ -227,7 +227,7 @@ const SPECIALTY_ROUTING = {
   'Urology': ['urinary problems', 'kidney stones', 'blood in urine', 'prostate issues', 'urinary incontinence', 'bladder problems'],
 };
 
-// ─── ORGAN → RISK FACTOR MAPPING (for Body Insights) ────────────
+// â”€â”€â”€ ORGAN â†’ RISK FACTOR MAPPING (for Body Insights) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const ORGAN_RISK_FACTORS = {
   heart: {
     name: 'Heart',
@@ -301,7 +301,7 @@ const ORGAN_RISK_FACTORS = {
   },
 };
 
-// ─── BMI RISK THRESHOLDS (WHO) ────────────────────────────────────
+// â”€â”€â”€ BMI RISK THRESHOLDS (WHO) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const BMI_CATEGORIES = {
   underweight: { min: 0, max: 18.5, risk: 'moderate', label: 'Underweight', color: '#60a5fa', risks: ['Nutrient deficiency', 'Weakened immune system', 'Osteoporosis risk'] },
   normal: { min: 18.5, max: 25, risk: 'low', label: 'Normal Weight', color: '#34d399', risks: ['Maintain current lifestyle'] },
@@ -311,7 +311,7 @@ const BMI_CATEGORIES = {
   obese3: { min: 40, max: 100, risk: 'critical', label: 'Obese Class III', color: '#dc2626', risks: ['Life-threatening cardiovascular events', 'Multiple organ stress', 'Severely reduced life expectancy'] },
 };
 
-// ─── HEALTH RECOMMENDATIONS BY CATEGORY ───────────────────────────
+// â”€â”€â”€ HEALTH RECOMMENDATIONS BY CATEGORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const HEALTH_RECOMMENDATIONS = {
   sleep: {
     low: ['Establish a consistent sleep schedule', 'Avoid screens 1 hour before bed', 'Create a dark, cool sleeping environment', 'Limit caffeine after 2 PM'],
@@ -336,15 +336,15 @@ const HEALTH_RECOMMENDATIONS = {
   }
 };
 
-// ─── URGENCY LEVEL DEFINITIONS ────────────────────────────────────
+// â”€â”€â”€ URGENCY LEVEL DEFINITIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const URGENCY_LEVELS = {
-  low: { label: 'Low Urgency', color: '#34d399', emoji: '🟢', action: 'Schedule a routine appointment within 1-2 weeks' },
-  medium: { label: 'Moderate Urgency', color: '#fbbf24', emoji: '🟡', action: 'See a doctor within 2-3 days' },
-  high: { label: 'High Urgency', color: '#f97316', emoji: '🟠', action: 'Seek medical attention within 24 hours' },
-  emergency: { label: 'Emergency', color: '#ef4444', emoji: '🔴', action: 'Call emergency services (911) or go to ER immediately' },
+  low: { label: 'Low Urgency', color: '#34d399', emoji: 'ðŸŸ¢', action: 'Schedule a routine appointment within 1-2 weeks' },
+  medium: { label: 'Moderate Urgency', color: '#fbbf24', emoji: 'ðŸŸ¡', action: 'See a doctor within 2-3 days' },
+  high: { label: 'High Urgency', color: '#f97316', emoji: 'ðŸŸ ', action: 'Seek medical attention within 24 hours' },
+  emergency: { label: 'Emergency', color: '#ef4444', emoji: 'ðŸ”´', action: 'Call emergency services (911) or go to ER immediately' },
 };
 
-// ─── HELPER FUNCTIONS ─────────────────────────────────────────────
+// â”€â”€â”€ HELPER FUNCTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 /**
  * Find supplement interactions for a given pair
@@ -502,7 +502,6 @@ module.exports = {
   getBMICategory,
   calculateOrganRisk
 };
- 
  
  
  
