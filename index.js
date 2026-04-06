@@ -1,0 +1,3924 @@
+module.exports = (app, mongoose, authenticate) => {
+    const standardErrorResponse = (res, statusCode, message, details = null) => {
+  const response = {
+    success: false,
+    message: message,
+    ...(details && process.env.NODE_ENV === 'development' && { details })
+  };
+  
+  return res.status(statusCode).json(response);
+};
+
+const formatIndianPhoneNumber = (phoneNumber) => {
+  if (!phoneNumber) return phoneNumber;
+  
+  // Remove all non-digits
+  const cleaned = phoneNumber.replace(/\D/g, '');
+  
+  // Check if it's a valid Indian mobile number (10 digits starting with 6-9)
+  if (cleaned.length === 10 && /^[6-9]/.test(cleaned)) {
+    return `+91 ${cleaned.slice(0, 5)} ${cleaned.slice(5)}`;
+  }
+  
+  // Return original if not a standard Indian mobile number
+  return phoneNumber;
+};
+// Food Item Schema
+const FoodItemSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  brand: { type: String, default: '' },
+  servingSize: { type: String, required: true },
+  calories: { type: Number, required: true },
+  protein: { type: Number, required: true },
+  carbs: { type: Number, required: true },
+  fat: { type: Number, required: true },
+  fiber: { type: Number, default: 0 },
+  sugar: { type: Number, default: 0 },
+  sodium: { type: Number, default: 0 },
+  cholesterol: { type: Number, default: 0 },
+  isCustom: { type: Boolean, default: false },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const FoodItem = mongoose.model('FoodItem', FoodItemSchema);
+// Meal Plan Schema
+const MealPlanSchema = new mongoose.Schema({
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  name: { 
+    type: String, 
+    required: true 
+  },
+  description: { 
+    type: String 
+  },
+  startDate: { 
+    type: Date, 
+    required: true 
+  },
+  endDate: { 
+    type: Date, 
+    required: true 
+  },
+  days: [{
+    day: { 
+      type: String, 
+      enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+      required: true 
+    },
+    date: { 
+      type: Date, 
+      required: true 
+    },
+    meals: [{
+      mealType: { 
+        type: String, 
+        enum: ['breakfast', 'lunch', 'dinner', 'snack'],
+        required: true 
+      },
+      items: [{
+        foodItem: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem' },
+        recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe' },
+        name: { type: String },
+        quantity: { type: Number, default: 1 },
+        unit: { type: String, default: 'serving' },
+        nutrition: {
+          calories: { type: Number, default: 0 },
+          protein: { type: Number, default: 0 },
+          carbs: { type: Number, default: 0 },
+          fat: { type: Number, default: 0 },
+          fiber: { type: Number, default: 0 }
+        }
+      }],
+      totalNutrition: {
+        calories: { type: Number, default: 0 },
+        protein: { type: Number, default: 0 },
+        carbs: { type: Number, default: 0 },
+        fat: { type: Number, default: 0 },
+        fiber: { type: Number, default: 0 }
+      }
+    }]
+  }],
+  totalNutrition: {
+    calories: { type: Number, default: 0 },
+    protein: { type: Number, default: 0 },
+    carbs: { type: Number, default: 0 },
+    fat: { type: Number, default: 0 },
+    fiber: { type: Number, default: 0 }
+  },
+  isActive: { 
+    type: Boolean, 
+    default: true 
+  },
+  createdAt: { 
+    type: Date, 
+    default: Date.now 
+  },
+  updatedAt: { 
+    type: Date, 
+    default: Date.now 
+  }
+});
+
+MealPlanSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  
+  // Calculate nutrition totals
+  if (this.isModified('days')) {
+    let totalCalories = 0;
+    let totalProtein = 0;
+    let totalCarbs = 0;
+    let totalFat = 0;
+    let totalFiber = 0;
+    
+    this.days.forEach(day => {
+      day.meals.forEach(meal => {
+        totalCalories += meal.totalNutrition.calories || 0;
+        totalProtein += meal.totalNutrition.protein || 0;
+        totalCarbs += meal.totalNutrition.carbs || 0;
+        totalFat += meal.totalNutrition.fat || 0;
+        totalFiber += meal.totalNutrition.fiber || 0;
+      });
+    });
+    
+    this.totalNutrition = {
+      calories: Math.round(totalCalories),
+      protein: Math.round(totalProtein * 100) / 100,
+      carbs: Math.round(totalCarbs * 100) / 100,
+      fat: Math.round(totalFat * 100) / 100,
+      fiber: Math.round(totalFiber * 100) / 100
+    };
+  }
+  
+  next();
+});
+
+const MealPlan = mongoose.model('MealPlan', MealPlanSchema);
+
+// Shopping List Schema
+const ShoppingListSchema = new mongoose.Schema({
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  mealPlanId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'MealPlan' 
+  },
+  name: { 
+    type: String, 
+    required: true 
+  },
+  items: [{
+    name: { type: String, required: true },
+    category: { 
+      type: String, 
+      enum: ['produce', 'protein', 'dairy', 'grains', 'pantry', 'frozen', 'other'],
+      default: 'other'
+    },
+    quantity: { type: Number, required: true },
+    unit: { type: String, required: true },
+    estimatedCost: { type: Number, default: 0 },
+    purchased: { type: Boolean, default: false },
+    notes: { type: String }
+  }],
+  totalEstimatedCost: { type: Number, default: 0 },
+  isActive: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+ShoppingListSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  this.totalEstimatedCost = this.items.reduce((total, item) => total + (item.estimatedCost || 0), 0);
+  next();
+});
+
+const ShoppingList = mongoose.model('ShoppingList', ShoppingListSchema);
+// Custom Recipe Schema
+// Enhanced Recipe Schema
+const RecipeSchema = new mongoose.Schema({
+  name: { 
+    type: String, 
+    required: true,
+    trim: true,
+    maxlength: 100
+  },
+  description: { 
+    type: String, 
+    trim: true,
+    maxlength: 500 
+  },
+  ingredients: [{
+    name: { type: String, required: true },
+    quantity: { type: Number, required: true },
+    unit: { 
+      type: String, 
+      required: true,
+      enum: ['g', 'kg', 'ml', 'l', 'tsp', 'tbsp', 'cup', 'piece', 'slice', 'pinch', 'clove', 'bunch', 'can'],
+      default: 'g'
+    },
+    foodItem: { 
+      type: mongoose.Schema.Types.ObjectId, 
+      ref: 'FoodItem' 
+    },
+    notes: { type: String, maxlength: 100 }
+  }],
+  servings: { 
+    type: Number, 
+    required: true,
+    min: 1,
+    max: 100
+  },
+  prepTime: { 
+    type: Number, 
+    min: 0,
+    default: 0 
+  }, // in minutes
+  cookTime: { 
+    type: Number, 
+    min: 0,
+    default: 0 
+  }, // in minutes
+  instructions: [{ 
+    type: String, 
+    required: true,
+    trim: true,
+    maxlength: 500 
+  }],
+  tags: [{ 
+    type: String,
+    trim: true,
+    maxlength: 50 
+  }],
+  category: {
+    type: String,
+    enum: ['breakfast', 'lunch', 'dinner', 'snack', 'dessert', 'beverage', 'other'],
+    default: 'other'
+  },
+  difficulty: {
+    type: String,
+    enum: ['easy', 'medium', 'hard'],
+    default: 'easy'
+  },
+  nutrition: {
+    calories: { type: Number, default: 0 },
+    protein: { type: Number, default: 0 },
+    carbs: { type: Number, default: 0 },
+    fat: { type: Number, default: 0 },
+    fiber: { type: Number, default: 0 },
+    sugar: { type: Number, default: 0 },
+    sodium: { type: Number, default: 0 }
+  },
+  imageUrl: { type: String },
+  createdBy: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  isPublic: { 
+    type: Boolean, 
+    default: false 
+  },
+  rating: {
+    average: { type: Number, default: 0, min: 0, max: 5 },
+    count: { type: Number, default: 0 }
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+// Update timestamp on save
+RecipeSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  next();
+});
+const Recipe = mongoose.model('Recipe', RecipeSchema);
+// Meal Schema
+    const MealSchema = new mongoose.Schema({
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+        name: { type: String, required: true },
+        type: { 
+            type: String, 
+            enum: ['breakfast', 'lunch', 'dinner', 'snack', 'other'],
+            required: true 
+        },
+        items: [{
+            foodItem: { type: mongoose.Schema.Types.ObjectId, ref: 'FoodItem' },
+            recipe: { type: mongoose.Schema.Types.ObjectId, ref: 'Recipe' },
+            quantity: { type: Number, required: true },
+            unit: { type: String, required: true }
+        }],
+        totalNutrition: {
+            calories: { type: Number },
+            protein: { type: Number },
+            carbs: { type: Number },
+            fat: { type: Number },
+            fiber: { type: Number }
+        },
+        date: { type: Date, required: true },
+        time: { type: String, required: true },
+        notes: { type: String },
+        createdAt: { type: Date, default: Date.now }
+    });
+
+    MealSchema.pre('save', async function(next) {
+        try {
+            let totalCalories = 0;
+            let totalProtein = 0;
+            let totalCarbs = 0;
+            let totalFat = 0;
+            let totalFiber = 0;
+            
+            if (this.items && this.items.length > 0) {
+                // Check if the first item's foodItem is fully populated
+                const firstItem = this.items[0];
+                const isPopulated = firstItem.foodItem && firstItem.foodItem.name !== undefined;
+                
+                if (isPopulated) {
+                    // Already populated
+                    this.items.forEach(item => {
+                        if (item.foodItem) {
+                            totalCalories += (item.foodItem.calories || 0) * (item.quantity || 1);
+                            totalProtein += (item.foodItem.protein || 0) * (item.quantity || 1);
+                            totalCarbs += (item.foodItem.carbs || 0) * (item.quantity || 1);
+                            totalFat += (item.foodItem.fat || 0) * (item.quantity || 1);
+                            totalFiber += (item.foodItem.fiber || 0) * (item.quantity || 1);
+                        }
+                    });
+                } else {
+                    // Need to populate
+                    await this.populate('items.foodItem');
+                    this.items.forEach(item => {
+                        if (item.foodItem) {
+                            totalCalories += (item.foodItem.calories || 0) * (item.quantity || 1);
+                            totalProtein += (item.foodItem.protein || 0) * (item.quantity || 1);
+                            totalCarbs += (item.foodItem.carbs || 0) * (item.quantity || 1);
+                            totalFat += (item.foodItem.fat || 0) * (item.quantity || 1);
+                            totalFiber += (item.foodItem.fiber || 0) * (item.quantity || 1);
+                        }
+                    });
+                }
+            }
+            
+            this.totalNutrition = {
+                calories: Math.round(totalCalories),
+                protein: Math.round(totalProtein * 100) / 100,
+                carbs: Math.round(totalCarbs * 100) / 100,
+                fat: Math.round(totalFat * 100) / 100,
+                fiber: Math.round(totalFiber * 100) / 100
+            };
+            
+            next();
+        } catch (error) {
+            console.error('Error in meal pre-save hook:', error);
+            next(error);
+        }
+    });
+const Meal = mongoose.model('Meal', MealSchema);
+
+// Water Intake Schema
+const WaterIntakeSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  amount: { type: Number, required: true }, // in ml
+  date: { type: Date, required: true },
+  time: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const WaterIntake = mongoose.model('WaterIntake', WaterIntakeSchema);
+
+// Nutritional Goals Schema
+    const NutritionalGoalsSchema = new mongoose.Schema({
+        userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, unique: true },
+        dailyCalories: { type: Number, default: 2000 },
+        protein: { type: Number, default: 150 }, // in grams
+        carbs: { type: Number, default: 250 },   // in grams
+        fat: { type: Number, default: 67 },      // in grams
+        fiber: { type: Number, default: 25 },    // in grams
+        water: { type: Number, default: 2000 },  // in ml
+        createdAt: { type: Date, default: Date.now },
+        updatedAt: { type: Date, default: Date.now }
+    });
+
+    NutritionalGoalsSchema.pre('save', function(next) {
+        this.updatedAt = Date.now();
+        next();
+    });
+
+
+const NutritionalGoals = mongoose.model('NutritionalGoals', NutritionalGoalsSchema);
+
+// Weight Tracking Schema
+const WeightTrackingSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  weight: { type: Number, required: true }, // in kg
+  date: { type: Date, required: true },
+  notes: { type: String },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const WeightTracking = mongoose.model('WeightTracking', WeightTrackingSchema);
+
+// Meal Plan Template Schema
+// Meal Plan Template Schema
+const MealPlanTemplateSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  description: { type: String },
+  dailyCalories: { type: Number, required: true },
+  protein: { type: Number, required: true },
+  carbs: { type: Number },
+  fat: { type: Number },
+  meals: [{
+    day: { 
+      type: String, 
+      enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+      required: true 
+    },
+    mealType: { 
+      type: String, 
+      enum: ['breakfast', 'lunch', 'dinner'],
+      required: true 
+    },
+    name: { type: String, required: true },
+    items: [{
+      name: { type: String, required: true },
+      quantity: { type: String },
+      nutrition: {
+        calories: { type: Number, default: 0 },
+        protein: { type: Number, default: 0 },
+        carbs: { type: Number, default: 0 },
+        fat: { type: Number, default: 0 }
+      }
+    }]
+  }],
+  isPublic: { type: Boolean, default: true },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const MealPlanTemplate = mongoose.model('MealPlanTemplate', MealPlanTemplateSchema);
+// Weekly Meal Plan Schema
+const WeeklyMealPlanSchema = new mongoose.Schema({
+  userId: { 
+    type: mongoose.Schema.Types.ObjectId, 
+    ref: 'User', 
+    required: true 
+  },
+  weekStartDate: { type: Date, required: true },
+  weekEndDate: { type: Date, required: true },
+  days: [{
+    day: { 
+      type: String, 
+      enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'],
+      required: true 
+    },
+    date: { type: Date, required: true },
+    meals: [{
+      mealType: { 
+        type: String, 
+        enum: ['breakfast', 'lunch', 'dinner'],
+        required: true 
+      },
+      name: { type: String },
+      items: [{
+        name: { type: String },
+        quantity: { type: String },
+        nutrition: {
+          calories: { type: Number, default: 0 },
+          protein: { type: Number, default: 0 },
+          carbs: { type: Number, default: 0 },
+          fat: { type: Number, default: 0 }
+        }
+      }],
+      totalNutrition: {
+        calories: { type: Number, default: 0 },
+        protein: { type: Number, default: 0 },
+        carbs: { type: Number, default: 0 },
+        fat: { type: Number, default: 0 }
+      }
+    }]
+  }],
+  totalNutrition: {
+    calories: { type: Number, default: 0 },
+    protein: { type: Number, default: 0 },
+    carbs: { type: Number, default: 0 },
+    fat: { type: Number, default: 0 }
+  },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
+});
+
+WeeklyMealPlanSchema.pre('save', function(next) {
+  this.updatedAt = Date.now();
+  
+  // Calculate nutrition totals
+  let totalCalories = 0;
+  let totalProtein = 0;
+  let totalCarbs = 0;
+  let totalFat = 0;
+  
+  this.days.forEach(day => {
+    day.meals.forEach(meal => {
+      totalCalories += meal.totalNutrition.calories || 0;
+      totalProtein += meal.totalNutrition.protein || 0;
+      totalCarbs += meal.totalNutrition.carbs || 0;
+      totalFat += meal.totalNutrition.fat || 0;
+    });
+  });
+  
+  this.totalNutrition = {
+    calories: Math.round(totalCalories),
+    protein: Math.round(totalProtein * 100) / 100,
+    carbs: Math.round(totalCarbs * 100) / 100,
+    fat: Math.round(totalFat * 100) / 100
+  };
+  
+  next();
+});
+
+const WeeklyMealPlan = mongoose.model('WeeklyMealPlan', WeeklyMealPlanSchema);
+
+// Appointment Schema
+const AppointmentSchema = new mongoose.Schema({
+  // Patient Information
+  patientName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  phone: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  
+  // Healthcare Provider
+  doctorName: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  specialty: {
+    type: String,
+    required: true,
+    enum: [
+      'General Practice', 'Cardiology', 'Dermatology', 'Endocrinology',
+      'Gastroenterology', 'Neurology', 'Orthopedics', 'Pediatrics',
+      'Psychiatry', 'Radiology', 'Surgery', 'Urology'
+    ]
+  },
+  website: {
+    type: String,
+    trim: true
+  },
+  
+  // Appointment Details
+  date: {
+    type: Date,
+    required: true
+  },
+  time: {
+    type: String,
+    required: true,
+    match: /^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/
+  },
+  duration: {
+    type: String,
+    required: true,
+    enum: ['15 minutes', '30 minutes', '45 minutes', '1 hour', '1.5 hours', '2 hours'],
+    default: '30 minutes'
+  },
+  type: {
+    type: String,
+    required: true,
+    enum: [
+      'Regular Checkup', 'Consultation', 'Follow-up', 'Emergency',
+      'Procedure', 'Surgery', 'Lab Test', 'Vaccination'
+    ]
+  },
+  status: {
+    type: String,
+    enum: ['pending', 'confirmed', 'completed', 'cancelled'],
+    default: 'pending'
+  },
+  priority: {
+    type: String,
+    enum: ['low', 'medium', 'high'],
+    default: 'medium'
+  },
+  cost: {
+    type: Number,
+    min: 0,
+    default: 0
+  },
+  paymentMethod: {
+    type: String,
+    enum: ['insurance', 'credit_card', 'cash'],
+    default: 'insurance'
+  },
+  
+  // Location & Contact
+  clinic: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  address: {
+    type: String,
+    trim: true
+  },
+  
+  // Insurance Information
+  insuranceProvider: {
+    type: String,
+    trim: true
+  },
+  policyNumber: {
+    type: String,
+    trim: true
+  },
+  
+  // Medical Information
+  symptoms: {
+    type: String,
+    trim: true
+  },
+  referralRequired: {
+    type: Boolean,
+    default: false
+  },
+  referralSource: {
+    type: String,
+    trim: true
+  },
+  
+  // Follow-up Information
+  followUpRequired: {
+    type: Boolean,
+    default: false
+  },
+  followUpDate: {
+    type: Date
+  },
+  
+  // Reminders & Notes
+  reminderSet: {
+    type: Boolean,
+    default: true
+  },
+  reminderTime: {
+    type: String,
+    enum: ['1 hour before', '2 hours before', '1 day before', '2 days before'],
+    default: '1 day before'
+  },
+  notes: {
+    type: String,
+    trim: true
+  },
+  
+  // Terms & Conditions
+  agreeToTerms: {
+    type: Boolean,
+    required: true,
+    validate: {
+      validator: function(v) {
+        return v === true;
+      },
+      message: 'You must agree to terms and conditions'
+    }
+  },
+  
+  // User reference - using your existing User model
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  userEmail: {
+    type: String,
+    required: true
+  },
+  
+  // System fields
+  isActive: {
+    type: Boolean,
+    default: true
+  },
+  reminderSent: {
+    type: Boolean,
+    default: false
+  },
+  lastReminderSent: {
+    type: Date
+  }
+}, {
+  timestamps: true
+});
+
+// Indexes for better performance
+AppointmentSchema.index({ userId: 1, date: 1, time: 1 });
+AppointmentSchema.index({ userEmail: 1, date: 1 });
+AppointmentSchema.index({ date: 1, reminderSet: 1, status: 1 });
+AppointmentSchema.index({ status: 1, isActive: 1 });
+
+// Virtual for appointment datetime
+AppointmentSchema.virtual('appointmentDateTime').get(function() {
+  const dateStr = this.date.toISOString().split('T')[0];
+  return new Date(`${dateStr} ${this.time}`);
+});
+AppointmentSchema.pre('save', function(next) {
+  if (this.isModified('phone')) {
+    this.phone = formatIndianPhoneNumber(this.phone);
+  }
+  next();
+});
+// Method to check if reminder should be sent
+AppointmentSchema.methods.shouldSendReminder = function() {
+  if (!this.reminderSet || this.status !== 'confirmed' || this.reminderSent) {
+    return false;
+  }
+  
+  const now = new Date();
+  const appointmentDateTime = this.appointmentDateTime;
+  const timeDiff = appointmentDateTime.getTime() - now.getTime();
+  const hoursDiff = timeDiff / (1000 * 3600);
+  
+  switch (this.reminderTime) {
+    case '1 hour before':
+      return hoursDiff <= 1 && hoursDiff > 0;
+    case '2 hours before':
+      return hoursDiff <= 2 && hoursDiff > 0;
+    case '1 day before':
+      return hoursDiff <= 24 && hoursDiff > 0;
+    case '2 days before':
+      return hoursDiff <= 48 && hoursDiff > 0;
+    default:
+      return false;
+  }
+};
+
+const Appointment = mongoose.model('Appointment', AppointmentSchema);
+
+// Reminder Settings Schema
+const ReminderSettingsSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true,
+    unique: true
+  },
+  userEmail: {
+    type: String,
+    required: true
+  },
+  defaultReminderTimes: [{
+    type: String,
+    enum: ['1 hour before', '2 hours before', '1 day before', '1 week before']
+  }],
+  notificationMethods: {
+    browser: {
+      type: Boolean,
+      default: true
+    },
+    email: {
+      type: Boolean,
+      default: true
+    },
+    sms: {
+      type: Boolean,
+      default: false
+    }
+  },
+  emailAddress: {
+    type: String,
+    trim: true
+  },
+  phoneNumber: {
+    type: String,
+    trim: true
+  }
+}, {
+  timestamps: true
+});
+ReminderSettingsSchema.pre('save', function(next) {
+  if (this.isModified('phoneNumber')) {
+    this.phoneNumber = formatIndianPhoneNumber(this.phoneNumber);
+  }
+  next();
+});
+const ReminderSettings = mongoose.model('ReminderSettings', ReminderSettingsSchema);
+
+// Appointment Statistics Schema
+const AppointmentStatsSchema = new mongoose.Schema({
+  userId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true
+  },
+  userEmail: {
+    type: String,
+    required: true
+  },
+  total: {
+    type: Number,
+    default: 0
+  },
+  confirmed: {
+    type: Number,
+    default: 0
+  },
+  pending: {
+    type: Number,
+    default: 0
+  },
+  activeReminders: {
+    type: Number,
+    default: 0
+  },
+  completed: {
+    type: Number,
+    default: 0
+  },
+  lastUpdated: {
+    type: Date,
+    default: Date.now
+  }
+}, {
+  timestamps: true
+});
+
+// Create index for faster queries
+AppointmentStatsSchema.index({ userId: 1, userEmail: 1 });
+
+const AppointmentStats = mongoose.model('AppointmentStats', AppointmentStatsSchema);
+// GET /api/appointments/count/total - Get total appointments count for user
+app.get('/api/appointments/count/total', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    
+    const totalCount = await Appointment.countDocuments({ 
+      userId: userId, 
+      userEmail: userEmail, 
+      isActive: true 
+    });
+    
+    res.json({
+      success: true,
+      count: totalCount,
+      message: `Total appointments: ${totalCount}`
+    });
+  } catch (err) {
+    console.error('Get total appointments count error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get total appointments count' 
+    });
+  }
+});
+// GET /api/appointments/count/pending - Get pending appointments count for user
+app.get('/api/appointments/count/pending', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    
+    const pendingCount = await Appointment.countDocuments({ 
+      userId: userId, 
+      userEmail: userEmail, 
+      status: 'pending',
+      isActive: true 
+    });
+    
+    res.json({
+      success: true,
+      count: pendingCount,
+      message: `Pending appointments: ${pendingCount}`
+    });
+  } catch (err) {
+    console.error('Get pending appointments count error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get pending appointments count' 
+    });
+  }
+});
+// GET /api/appointments/count/confirmed - Get confirmed appointments count for user
+app.get('/api/appointments/count/confirmed', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    
+    const confirmedCount = await Appointment.countDocuments({ 
+      userId: userId, 
+      userEmail: userEmail, 
+      status: 'confirmed',
+      isActive: true 
+    });
+    
+    res.json({
+      success: true,
+      count: confirmedCount,
+      message: `Confirmed appointments: ${confirmedCount}`
+    });
+  } catch (err) {
+    console.error('Get confirmed appointments count error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get confirmed appointments count' 
+    });
+  }
+});
+// GET /api/appointments/count/completed - Get completed appointments count for user
+app.get('/api/appointments/count/completed', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    
+    const completedCount = await Appointment.countDocuments({ 
+      userId: userId, 
+      userEmail: userEmail, 
+      status: 'completed',
+      isActive: true 
+    });
+    
+    res.json({
+      success: true,
+      count: completedCount,
+      message: `Completed appointments: ${completedCount}`
+    });
+  } catch (err) {
+    console.error('Get completed appointments count error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get completed appointments count' 
+    });
+  }
+});
+// GET /api/appointments/count/active-reminders - Get active reminders count for user
+app.get('/api/appointments/count/active-reminders', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    const now = new Date();
+    const twoDaysFromNow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+    
+    // First get appointments that match the criteria
+    const appointments = await Appointment.find({
+      userId: userId,
+      userEmail: userEmail,
+      reminderSet: true,
+      status: 'confirmed',
+      isActive: true,
+      date: { $gte: now, $lte: twoDaysFromNow }
+    });
+    
+    // Filter appointments that should send reminders
+    const activeRemindersCount = appointments.filter(appointment => 
+      appointment.shouldSendReminder()
+    ).length;
+    
+    res.json({
+      success: true,
+      count: activeRemindersCount,
+      message: `Active reminders: ${activeRemindersCount}`
+    });
+  } catch (err) {
+    console.error('Get active reminders count error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get active reminders count' 
+    });
+  }
+});
+// GET /api/appointments/statistics/all - Get all statistics in one call
+app.get('/api/appointments/statistics/all', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    const now = new Date();
+    const twoDaysFromNow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+    
+    // Get all counts in parallel for better performance
+    const [
+      totalCount,
+      pendingCount,
+      confirmedCount,
+      completedCount,
+      appointmentsForReminders
+    ] = await Promise.all([
+      // Total appointments
+      Appointment.countDocuments({ 
+        userId: userId, 
+        userEmail: userEmail, 
+        isActive: true 
+      }),
+      
+      // Pending appointments
+      Appointment.countDocuments({ 
+        userId: userId, 
+        userEmail: userEmail, 
+        status: 'pending',
+        isActive: true 
+      }),
+      
+      // Confirmed appointments
+      Appointment.countDocuments({ 
+        userId: userId, 
+        userEmail: userEmail, 
+        status: 'confirmed',
+        isActive: true 
+      }),
+      
+      // Completed appointments
+      Appointment.countDocuments({ 
+        userId: userId, 
+        userEmail: userEmail, 
+        status: 'completed',
+        isActive: true 
+      }),
+      
+      // Appointments for reminders calculation
+      Appointment.find({
+        userId: userId,
+        userEmail: userEmail,
+        reminderSet: true,
+        status: 'confirmed',
+        isActive: true,
+        date: { $gte: now, $lte: twoDaysFromNow }
+      })
+    ]);
+    
+    // Calculate active reminders
+    const activeRemindersCount = appointmentsForReminders.filter(appointment => 
+      appointment.shouldSendReminder()
+    ).length;
+    
+    res.json({
+      success: true,
+      statistics: {
+        total: totalCount,
+        pending: pendingCount,
+        confirmed: confirmedCount,
+        completed: completedCount,
+        activeReminders: activeRemindersCount
+      },
+      message: 'Statistics retrieved successfully'
+    });
+  } catch (err) {
+    console.error('Get all statistics error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get statistics' 
+    });
+  }
+});
+
+// GET /api/appointments/reminders - Get all active reminders for user
+app.get('/api/appointments/reminders', authenticate, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const userEmail = req.user.email;
+    const now = new Date();
+    const oneWeekFromNow = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+    
+    // Get appointments that are upcoming and have reminders set
+    const appointments = await Appointment.find({
+      userId: userId,
+      userEmail: userEmail,
+      status: { $in: ['confirmed', 'pending'] },
+      isActive: true,
+      date: { $gte: now, $lte: oneWeekFromNow }
+    }).sort({ date: 1, time: 1 });
+    
+    // Filter appointments that need reminders
+    const reminders = appointments.filter(appointment => {
+      const appointmentDateTime = new Date(`${appointment.date.toISOString().split('T')[0]} ${appointment.time}`);
+      const timeDiff = appointmentDateTime.getTime() - now.getTime();
+      const hoursDiff = timeDiff / (1000 * 3600);
+      
+      return hoursDiff <= 48; // Show reminders for appointments within 48 hours
+    }).map(appointment => {
+      const appointmentDateTime = new Date(`${appointment.date.toISOString().split('T')[0]} ${appointment.time}`);
+      const timeDiff = appointmentDateTime.getTime() - now.getTime();
+      const hoursDiff = Math.ceil(timeDiff / (1000 * 3600));
+      
+      return {
+        _id: appointment._id,
+        patientName: appointment.patientName,
+        doctorName: appointment.doctorName,
+        specialty: appointment.specialty,
+        date: appointment.date,
+        time: appointment.time,
+        duration: appointment.duration,
+        clinic: appointment.clinic,
+        address: appointment.address,
+        phone: appointment.phone,
+        status: appointment.status,
+        hoursUntil: hoursDiff,
+        urgency: hoursDiff <= 1 ? 'urgent' : hoursDiff <= 24 ? 'today' : 'upcoming'
+      };
+    });
+    
+    res.json({
+      success: true,
+      reminders: reminders,
+      total: reminders.length
+    });
+  } catch (err) {
+    console.error('Get reminders error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to get reminders' 
+    });
+  }
+});
+
+// PATCH /api/appointments/reminders/:id/snooze - Snooze a reminder for 1 hour
+app.patch('/api/appointments/reminders/:id/snooze', authenticate, async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+      userEmail: req.user.email,
+      isActive: true
+    });
+    
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    // In a real app, you would update a snooze field in the database
+    // For now, we'll just return success
+    res.json({
+      success: true,
+      message: 'Reminder snoozed for 1 hour'
+    });
+  } catch (err) {
+    console.error('Snooze reminder error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to snooze reminder' 
+    });
+  }
+});
+
+// PATCH /api/appointments/reminders/:id/mark-missed - Mark reminder as missed
+app.patch('/api/appointments/reminders/:id/mark-missed', authenticate, async (req, res) => {
+  try {
+    const appointment = await Appointment.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.user._id,
+        userEmail: req.user.email,
+        isActive: true
+      },
+      { 
+        status: 'cancelled',
+        reminderSet: false 
+      },
+      { new: true }
+    );
+    
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Appointment marked as missed'
+    });
+  } catch (err) {
+    console.error('Mark missed error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to mark as missed' 
+    });
+  }
+});
+// Enhanced Reports API Routes
+
+// GET /api/reports/comprehensive - Comprehensive report with all data
+app.get('/api/reports/comprehensive', authenticate, async (req, res) => {
+  try {
+    const { period = '7' } = req.query; // 7, 14, 30 days
+    const userId = req.user._id;
+    const days = parseInt(period);
+    
+    // Calculate date range
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(endDate.getDate() - days + 1);
+    
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    
+    console.log(`Generating comprehensive report for ${days} days:`, {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString()
+    });
+
+    // Get meals data
+    const meals = await Meal.find({
+      userId: userId,
+      date: { $gte: startDate, $lte: endDate }
+    })
+    .populate('items.foodItem')
+    .populate('items.recipe')
+    .lean();
+
+    // Get water intake data
+    const waterIntakes = await WaterIntake.find({
+      userId: userId,
+      date: { $gte: startDate, $lte: endDate }
+    }).lean();
+
+    // Get nutritional goals
+    const goals = await NutritionalGoals.findOne({ userId: userId }) || {
+      dailyCalories: 2000,
+      protein: 150,
+      carbs: 250,
+      fat: 67,
+      fiber: 25,
+      water: 2000
+    };
+
+    // Process daily data
+    const dailyData = {};
+    const dailyTotals = {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      water: 0
+    };
+
+    // Initialize all days in range
+    for (let i = 0; i < days; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
+      const dateKey = currentDate.toISOString().split('T')[0];
+      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+      
+      dailyData[dateKey] = {
+        day: `${dayName} ${currentDate.getDate()}`,
+        date: dateKey,
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        water: 0,
+        meals: []
+      };
+    }
+
+    // Process meals
+    meals.forEach(meal => {
+      const dateKey = meal.date.toISOString().split('T')[0];
+      if (dailyData[dateKey]) {
+        let mealCalories = 0;
+        let mealProtein = 0;
+        let mealCarbs = 0;
+        let mealFat = 0;
+        let mealFiber = 0;
+
+        // Calculate nutrition from meal
+        if (meal.totalNutrition && meal.totalNutrition.calories > 0) {
+          mealCalories = meal.totalNutrition.calories || 0;
+          mealProtein = meal.totalNutrition.protein || 0;
+          mealCarbs = meal.totalNutrition.carbs || 0;
+          mealFat = meal.totalNutrition.fat || 0;
+          mealFiber = meal.totalNutrition.fiber || 0;
+        } else if (meal.items && meal.items.length > 0) {
+          meal.items.forEach(item => {
+            let itemNutrition = {};
+            
+            if (item.foodItem) {
+              itemNutrition = {
+                calories: item.foodItem.calories || 0,
+                protein: item.foodItem.protein || 0,
+                carbs: item.foodItem.carbs || 0,
+                fat: item.foodItem.fat || 0,
+                fiber: item.foodItem.fiber || 0
+              };
+            } else if (item.recipe && item.recipe.nutrition) {
+              itemNutrition = {
+                calories: item.recipe.nutrition.calories || 0,
+                protein: item.recipe.nutrition.protein || 0,
+                carbs: item.recipe.nutrition.carbs || 0,
+                fat: item.recipe.nutrition.fat || 0,
+                fiber: item.recipe.nutrition.fiber || 0
+              };
+            }
+            
+            const quantity = item.quantity || 1;
+            mealCalories += (itemNutrition.calories || 0) * quantity;
+            mealProtein += (itemNutrition.protein || 0) * quantity;
+            mealCarbs += (itemNutrition.carbs || 0) * quantity;
+            mealFat += (itemNutrition.fat || 0) * quantity;
+            mealFiber += (itemNutrition.fiber || 0) * quantity;
+          });
+        }
+
+        // Add to daily totals
+        dailyData[dateKey].calories += Math.round(mealCalories);
+        dailyData[dateKey].protein += Math.round(mealProtein * 100) / 100;
+        dailyData[dateKey].carbs += Math.round(mealCarbs * 100) / 100;
+        dailyData[dateKey].fat += Math.round(mealFat * 100) / 100;
+        dailyData[dateKey].fiber += Math.round(mealFiber * 100) / 100;
+        
+        // Track meal type for breakdown
+        dailyData[dateKey].meals.push({
+          type: meal.type,
+          calories: Math.round(mealCalories)
+        });
+      }
+    });
+
+    // Process water intake
+    waterIntakes.forEach(intake => {
+      const dateKey = intake.date.toISOString().split('T')[0];
+      if (dailyData[dateKey]) {
+        dailyData[dateKey].water += intake.amount || 0;
+      }
+    });
+
+    // Convert to array and calculate overall totals
+    const weeklyData = Object.values(dailyData).map(day => {
+      dailyTotals.calories += day.calories;
+      dailyTotals.protein += day.protein;
+      dailyTotals.carbs += day.carbs;
+      dailyTotals.fat += day.fat;
+      dailyTotals.fiber += day.fiber;
+      dailyTotals.water += day.water;
+      
+      return {
+        ...day,
+        calories: Math.round(day.calories),
+        protein: Math.round(day.protein * 10) / 10,
+        carbs: Math.round(day.carbs * 10) / 10,
+        fat: Math.round(day.fat * 10) / 10,
+        fiber: Math.round(day.fiber * 10) / 10
+      };
+    });
+
+    // Sort by date
+    weeklyData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    // Calculate meal type breakdown for the period
+    const mealTypeBreakdown = {};
+    weeklyData.forEach(day => {
+      day.meals.forEach(meal => {
+        if (!mealTypeBreakdown[meal.type]) {
+          mealTypeBreakdown[meal.type] = 0;
+        }
+        mealTypeBreakdown[meal.type] += meal.calories;
+      });
+    });
+
+    // Calculate statistics
+    const totalDays = weeklyData.length;
+    const daysWithData = weeklyData.filter(day => day.calories > 0).length;
+    const averageCalories = Math.round(dailyTotals.calories / totalDays);
+    const averageProtein = Math.round(dailyTotals.protein / totalDays);
+    const averageCarbs = Math.round(dailyTotals.carbs / totalDays);
+    const averageFat = Math.round(dailyTotals.fat / totalDays);
+    const averageWater = Math.round(dailyTotals.water / totalDays);
+
+    // Goal achievement rates
+    const calorieGoalRate = Math.min(100, (dailyTotals.calories / (goals.dailyCalories * totalDays)) * 100);
+    const proteinGoalRate = Math.min(100, (dailyTotals.protein / (goals.protein * totalDays)) * 100);
+    const carbsGoalRate = Math.min(100, (dailyTotals.carbs / (goals.carbs * totalDays)) * 100);
+    const fatGoalRate = Math.min(100, (dailyTotals.fat / (goals.fat * totalDays)) * 100);
+    const waterGoalRate = Math.min(100, (dailyTotals.water / (goals.water * totalDays)) * 100);
+
+    res.json({
+      success: true,
+      data: {
+        period: `${days} days`,
+        startDate: startDate.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        dailyData: weeklyData,
+        summary: {
+          totalCalories: Math.round(dailyTotals.calories),
+          totalProtein: Math.round(dailyTotals.protein),
+          totalCarbs: Math.round(dailyTotals.carbs),
+          totalFat: Math.round(dailyTotals.fat),
+          totalWater: Math.round(dailyTotals.water),
+          averageCalories,
+          averageProtein,
+          averageCarbs,
+          averageFat,
+          averageWater,
+          daysTracked: daysWithData,
+          totalDays: totalDays,
+          trackingRate: Math.round((daysWithData / totalDays) * 100)
+        },
+        goals: goals,
+        goalAchievement: {
+          calories: Math.round(calorieGoalRate),
+          protein: Math.round(proteinGoalRate),
+          carbs: Math.round(carbsGoalRate),
+          fat: Math.round(fatGoalRate),
+          water: Math.round(waterGoalRate)
+        },
+        mealTypeBreakdown,
+        statistics: {
+          bestDay: weeklyData.reduce((max, day) => day.calories > max.calories ? day : max, weeklyData[0]),
+          worstDay: weeklyData.reduce((min, day) => day.calories < min.calories ? day : min, weeklyData[0]),
+          consistency: Math.round((daysWithData / totalDays) * 100)
+        }
+      }
+    });
+
+  } catch (error) {
+    console.error('Comprehensive report error:', error);
+    standardErrorResponse(res, 500, 'Failed to generate comprehensive report', error.message);
+  }
+});
+
+// GET /api/reports/export - Export report data
+app.get('/api/reports/export', authenticate, async (req, res) => {
+  try {
+    const { type, format = 'json', period = '7' } = req.query;
+    const userId = req.user._id;
+    
+    // Generate the comprehensive report
+    const reportResponse = await generateComprehensiveReport(userId, period);
+    
+    if (format === 'csv') {
+      // Convert to CSV format
+      const csvData = convertReportToCSV(reportResponse.data);
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', `attachment; filename=nutrition-report-${period}days.csv`);
+      return res.send(csvData);
+    } else if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename=nutrition-report-${period}days.json`);
+      return res.json(reportResponse);
+    } else {
+      return standardErrorResponse(res, 400, 'Unsupported export format');
+    }
+  } catch (error) {
+    console.error('Export report error:', error);
+    standardErrorResponse(res, 500, 'Failed to export report', error.message);
+  }
+});
+
+// Helper function to generate comprehensive report
+async function generateComprehensiveReport(userId, period = '7') {
+  const days = parseInt(period);
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(endDate.getDate() - days + 1);
+  
+  startDate.setHours(0, 0, 0, 0);
+  endDate.setHours(23, 59, 59, 999);
+
+  // Get meals data
+  const meals = await Meal.find({
+    userId: userId,
+    date: { $gte: startDate, $lte: endDate }
+  })
+  .populate('items.foodItem')
+  .populate('items.recipe')
+  .lean();
+
+  // Get water intake data
+  const waterIntakes = await WaterIntake.find({
+    userId: userId,
+    date: { $gte: startDate, $lte: endDate }
+  }).lean();
+
+  // Get nutritional goals
+  const goals = await NutritionalGoals.findOne({ userId: userId }) || {
+    dailyCalories: 2000,
+    protein: 150,
+    carbs: 250,
+    fat: 67,
+    fiber: 25,
+    water: 2000
+  };
+
+  // Process data (similar to comprehensive report route)
+  const dailyData = {};
+  const dailyTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, water: 0 };
+
+  // Initialize all days
+  for (let i = 0; i < days; i++) {
+    const currentDate = new Date(startDate);
+    currentDate.setDate(startDate.getDate() + i);
+    const dateKey = currentDate.toISOString().split('T')[0];
+    const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+    
+    dailyData[dateKey] = {
+      day: `${dayName} ${currentDate.getDate()}`,
+      date: dateKey,
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      water: 0
+    };
+  }
+
+  // Process meals
+  meals.forEach(meal => {
+    const dateKey = meal.date.toISOString().split('T')[0];
+    if (dailyData[dateKey]) {
+      let mealCalories = 0;
+      let mealProtein = 0;
+      let mealCarbs = 0;
+      let mealFat = 0;
+      let mealFiber = 0;
+
+      if (meal.totalNutrition && meal.totalNutrition.calories > 0) {
+        mealCalories = meal.totalNutrition.calories || 0;
+        mealProtein = meal.totalNutrition.protein || 0;
+        mealCarbs = meal.totalNutrition.carbs || 0;
+        mealFat = meal.totalNutrition.fat || 0;
+        mealFiber = meal.totalNutrition.fiber || 0;
+      } else if (meal.items && meal.items.length > 0) {
+        meal.items.forEach(item => {
+          let itemNutrition = {};
+          
+          if (item.foodItem) {
+            itemNutrition = {
+              calories: item.foodItem.calories || 0,
+              protein: item.foodItem.protein || 0,
+              carbs: item.foodItem.carbs || 0,
+              fat: item.foodItem.fat || 0,
+              fiber: item.foodItem.fiber || 0
+            };
+          } else if (item.recipe && item.recipe.nutrition) {
+            itemNutrition = {
+              calories: item.recipe.nutrition.calories || 0,
+              protein: item.recipe.nutrition.protein || 0,
+              carbs: item.recipe.nutrition.carbs || 0,
+              fat: item.recipe.nutrition.fat || 0,
+              fiber: item.recipe.nutrition.fiber || 0
+            };
+          }
+          
+          const quantity = item.quantity || 1;
+          mealCalories += (itemNutrition.calories || 0) * quantity;
+          mealProtein += (itemNutrition.protein || 0) * quantity;
+          mealCarbs += (itemNutrition.carbs || 0) * quantity;
+          mealFat += (itemNutrition.fat || 0) * quantity;
+          mealFiber += (itemNutrition.fiber || 0) * quantity;
+        });
+      }
+
+      dailyData[dateKey].calories += Math.round(mealCalories);
+      dailyData[dateKey].protein += Math.round(mealProtein * 100) / 100;
+      dailyData[dateKey].carbs += Math.round(mealCarbs * 100) / 100;
+      dailyData[dateKey].fat += Math.round(mealFat * 100) / 100;
+      dailyData[dateKey].fiber += Math.round(mealFiber * 100) / 100;
+    }
+  });
+
+  // Process water intake
+  waterIntakes.forEach(intake => {
+    const dateKey = intake.date.toISOString().split('T')[0];
+    if (dailyData[dateKey]) {
+      dailyData[dateKey].water += intake.amount || 0;
+    }
+  });
+
+  // Convert to array
+  const weeklyData = Object.values(dailyData).map(day => {
+    dailyTotals.calories += day.calories;
+    dailyTotals.protein += day.protein;
+    dailyTotals.carbs += day.carbs;
+    dailyTotals.fat += day.fat;
+    dailyTotals.fiber += day.fiber;
+    dailyTotals.water += day.water;
+    
+    return {
+      ...day,
+      calories: Math.round(day.calories),
+      protein: Math.round(day.protein * 10) / 10,
+      carbs: Math.round(day.carbs * 10) / 10,
+      fat: Math.round(day.fat * 10) / 10,
+      fiber: Math.round(day.fiber * 10) / 10
+    };
+  });
+
+  weeklyData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+  return {
+    success: true,
+    data: {
+      period: `${days} days`,
+      dailyData: weeklyData,
+      totals: dailyTotals,
+      goals: goals
+    }
+  };
+}
+
+// Helper function to convert report to CSV
+function convertReportToCSV(reportData) {
+  const headers = ['Date', 'Day', 'Calories', 'Protein (g)', 'Carbs (g)', 'Fat (g)', 'Fiber (g)', 'Water (ml)'];
+  const rows = reportData.dailyData.map(day => [
+    day.date,
+    day.day,
+    day.calories,
+    day.protein,
+    day.carbs,
+    day.fat,
+    day.fiber,
+    day.water
+  ]);
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.join(','))
+  ].join('\n');
+
+  return csvContent;
+}
+// DELETE /api/appointments/reminders/:id - Delete reminder (soft delete)
+app.delete('/api/appointments/reminders/:id', authenticate, async (req, res) => {
+  try {
+    const appointment = await Appointment.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.user._id,
+        userEmail: req.user.email,
+        isActive: true
+      },
+      { 
+        reminderSet: false 
+      },
+      { new: true }
+    );
+    
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Reminder deleted successfully'
+    });
+  } catch (err) {
+    console.error('Delete reminder error:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to delete reminder' 
+    });
+  }
+});
+// Add this helper function
+const convertToUTC = (date) => {
+  if (!date) return date;
+  
+  // If it's a string, parse it
+  if (typeof date === 'string') {
+    date = new Date(date);
+  }
+  
+  // Convert local date to UTC by using the same UTC time
+  return new Date(Date.UTC(
+    date.getUTCFullYear(),
+    date.getUTCMonth(),
+    date.getUTCDate(),
+    date.getUTCHours(),
+    date.getUTCMinutes(),
+    date.getUTCSeconds()
+  ));
+};
+
+
+// Food Items Routes
+app.get('/api/food-items', authenticate, async (req, res) => {
+        try {
+            const { search, page = 1, limit = 20 } = req.query;
+            let query = { $or: [{ isCustom: false }, { createdBy: req.user._id }] };
+            
+            if (search) {
+                query.name = { $regex: search, $options: 'i' };
+            }
+            
+            const foodItems = await FoodItem.find(query)
+                .limit(limit * 1)
+                .skip((page - 1) * limit);
+            
+            res.json({
+                success: true,
+                data: foodItems,
+                page: parseInt(page),
+                limit: parseInt(limit)
+            });
+        } catch (error) {
+            console.error('Get food items error:', error);
+            standardErrorResponse(res, 500, 'Failed to retrieve food items', error.message);
+        }
+    });
+app.get('/api/food-items/:id', authenticate, async (req, res) => {
+        try {
+            const foodItem = await FoodItem.findById(req.params.id);
+            if (!foodItem) {
+                return standardErrorResponse(res, 404, 'Food item not found');
+            }
+            res.json({
+                success: true,
+                data: foodItem
+            });
+        } catch (error) {
+            console.error('Get food item error:', error);
+            standardErrorResponse(res, 500, 'Failed to retrieve food item', error.message);
+        }
+    });
+
+ app.post('/api/food-items', authenticate, async (req, res) => {
+        try {
+            const foodItem = new FoodItem({
+                ...req.body,
+                isCustom: true,
+                createdBy: req.user._id
+            });
+            
+            await foodItem.save();
+            res.status(201).json({
+                success: true,
+                message: 'Food item created successfully',
+                data: foodItem
+            });
+        } catch (error) {
+            console.error('Create food item error:', error);
+            standardErrorResponse(res, 500, 'Failed to create food item', error.message);
+        }
+    });
+
+// Recipe Routes
+app.get('/api/recipes', authenticate, async (req, res) => {
+        try {
+            const recipes = await Recipe.find({
+                $or: [{ createdBy: req.user._id }, { isPublic: true }]
+            }).populate('ingredients.foodItem');
+            
+            res.json({
+                success: true,
+                data: recipes
+            });
+        } catch (error) {
+            console.error('Get recipes error:', error);
+            standardErrorResponse(res, 500, 'Failed to retrieve recipes', error.message);
+        }
+    });
+
+    app.post('/api/recipes', authenticate, async (req, res) => {
+        try {
+            const recipe = new Recipe({
+                ...req.body,
+                createdBy: req.user._id
+            });
+            
+            await recipe.save();
+            await recipe.populate('ingredients.foodItem');
+            
+            res.status(201).json({
+                success: true,
+                message: 'Recipe created successfully',
+                data: recipe
+            });
+        } catch (error) {
+            console.error('Create recipe error:', error);
+            standardErrorResponse(res, 500, 'Failed to create recipe', error.message);
+        }
+    });
+
+// Meal Routes - FIXED
+    app.get('/api/meals', authenticate, async (req, res) => {
+        try {
+            const { date } = req.query;
+            let query = { userId: req.user._id };
+            
+            if (date) {
+                const targetDate = new Date(date);
+                const startOfDay = new Date(targetDate);
+                startOfDay.setHours(0, 0, 0, 0);
+                
+                const endOfDay = new Date(targetDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                
+                query.date = { $gte: startOfDay, $lte: endOfDay };
+            }
+            
+            const meals = await Meal.find(query)
+                .populate('items.foodItem')
+                .populate('items.recipe')
+                .sort({ time: 1 });
+            
+            res.json({
+                success: true,
+                data: meals
+            });
+        } catch (error) {
+            console.error('Get meals error:', error);
+            standardErrorResponse(res, 500, 'Failed to retrieve meals', error.message);
+        }
+    });
+
+    // In your server code, update the meal creation route
+app.post('/api/meals', authenticate, async (req, res) => {
+    try {
+        const mealData = req.body;
+        
+        console.log('Received meal data:', mealData);
+        
+        // Process items - handle both USDA foods and regular food items
+        const processedItems = await Promise.all(mealData.items.map(async (item) => {
+            console.log('Processing item:', item);
+            
+            if (item.fdcId) {
+                // This is a USDA food item - create a FoodItem record
+                const foodItem = new FoodItem({
+                    name: item.name,
+                    brand: item.brandOwner || item.brand || '',
+                    servingSize: `${item.servingSize || 100} ${item.servingSizeUnit || 'g'}`,
+                    calories: item.calories || 0,
+                    protein: item.protein || 0,
+                    carbs: item.carbs || 0,
+                    fat: item.fat || 0,
+                    fiber: item.fiber || 0,
+                    isCustom: true,
+                    createdBy: req.user._id
+                });
+                
+                await foodItem.save();
+                console.log('Created food item:', foodItem);
+                
+                return {
+                    foodItem: foodItem._id,
+                    quantity: item.quantity || 1,
+                    unit: item.servingSizeUnit || 'g'
+                };
+            } else if (item.foodItem) {
+                // Regular food item with foodItem ID
+                return {
+                    foodItem: item.foodItem,
+                    quantity: item.quantity || 1,
+                    unit: item.unit || 'serving'
+                };
+            } else if (item.calories !== undefined) {
+                // Direct nutrition data without fdcId - create a custom food item
+                const foodItem = new FoodItem({
+                    name: item.name || 'Custom Food',
+                    brand: item.brandOwner || item.brand || '',
+                    servingSize: `${item.servingSize || 100} ${item.servingSizeUnit || 'g'}`,
+                    calories: item.calories || 0,
+                    protein: item.protein || 0,
+                    carbs: item.carbs || 0,
+                    fat: item.fat || 0,
+                    fiber: item.fiber || 0,
+                    isCustom: true,
+                    createdBy: req.user._id
+                });
+                
+                await foodItem.save();
+                console.log('Created custom food item:', foodItem);
+                
+                return {
+                    foodItem: foodItem._id,
+                    quantity: item.quantity || 1,
+                    unit: item.servingSizeUnit || 'g'
+                };
+            } else {
+                throw new Error('Invalid food item structure');
+            }
+        }));
+
+        console.log('Processed items:', processedItems);
+
+        // Create the meal with processed items
+        const meal = new Meal({
+            userId: req.user._id,
+            name: mealData.name,
+            type: mealData.type,
+            items: processedItems,
+            date: new Date(mealData.date),
+            time: mealData.time || new Date().toLocaleTimeString(),
+            notes: mealData.notes || ''
+        });
+
+        console.log('Saving meal:', meal);
+        
+        await meal.save();
+
+        // Populate and return the meal with full nutrition data
+        const populatedMeal = await Meal.findById(meal._id)
+            .populate('items.foodItem')
+            .populate('items.recipe');
+            
+        console.log('Populated meal:', populatedMeal);
+            
+        res.status(201).json({
+            success: true,
+            message: 'Meal created successfully',
+            data: populatedMeal
+        });
+        
+    } catch (error) {
+        console.error('Error creating meal:', error);
+        standardErrorResponse(res, 500, 'Failed to create meal', error.message);
+    }
+});
+
+    app.delete('/api/meals/:id', authenticate, async (req, res) => {
+        try {
+            const meal = await Meal.findById(req.params.id);
+            if (!meal) {
+                return standardErrorResponse(res, 404, 'Meal not found');
+            }
+            
+            if (meal.userId.toString() !== req.user._id.toString()) {
+                return standardErrorResponse(res, 403, 'Not authorized'); 
+            }
+            
+            await Meal.findByIdAndDelete(req.params.id);
+            res.json({
+                success: true,
+                message: 'Meal deleted successfully'
+            });
+        } catch (error) {
+            console.error('Delete meal error:', error);
+            standardErrorResponse(res, 500, 'Failed to delete meal', error.message);
+        }
+    });
+ // Water Intake Routes
+    app.get('/api/water-intake', authenticate, async (req, res) => {
+        try {
+            const { date } = req.query;
+            let query = { userId: req.user._id };
+            
+            if (date) {
+                const targetDate = new Date(date);
+                const startOfDay = new Date(targetDate);
+                startOfDay.setHours(0, 0, 0, 0);
+                
+                const endOfDay = new Date(targetDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                
+                query.date = { $gte: startOfDay, $lte: endOfDay };
+            }
+            
+            const waterIntakes = await WaterIntake.find(query);
+            const total = waterIntakes.reduce((sum, intake) => sum + intake.amount, 0);
+            
+            res.json({
+                success: true,
+                data: {
+                    entries: waterIntakes,
+                    total: total
+                }
+            });
+        } catch (error) {
+            console.error('Get water intake error:', error);
+            standardErrorResponse(res, 500, 'Failed to retrieve water intake data', error.message);
+        }
+    });
+
+// GET /api/reports/weekly-calories - FIXED VERSION
+app.get('/api/reports/weekly-calories', authenticate, async (req, res) => {
+  try {
+    const { startDate } = req.query;
+    const userId = req.user._id;
+    
+    console.log('Weekly calories request for user:', userId, 'startDate:', startDate);
+    
+    // Calculate date range (last 7 days including today)
+    const endDate = startDate ? new Date(startDate) : new Date();
+    const startDateObj = new Date(endDate);
+    startDateObj.setDate(endDate.getDate() - 6); // 7 days total
+    
+    // Set to start and end of days
+    startDateObj.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    
+    console.log('Date range:', startDateObj.toISOString(), 'to', endDate.toISOString());
+    
+    // Get meals for the date range
+    const meals = await Meal.find({
+      userId: userId,
+      date: { 
+        $gte: startDateObj, 
+        $lte: endDate 
+      },
+      isActive: true
+    })
+    .populate('items.foodItem')
+    .populate('items.recipe')
+    .lean(); // Use lean for better performance
+    
+    console.log('Found meals:', meals.length);
+    
+    // Get water intake for the date range
+    const waterIntakes = await WaterIntake.find({
+      userId: userId,
+      date: { 
+        $gte: startDateObj, 
+        $lte: endDate 
+      }
+    }).lean();
+    
+    console.log('Found water intakes:', waterIntakes.length);
+    
+    // Group data by day
+    const dailyData = {};
+    
+    // Initialize all days in the range with proper structure
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(startDateObj);
+      currentDate.setDate(startDateObj.getDate() + i);
+      const dateKey = currentDate.toISOString().split('T')[0];
+      const dayName = currentDate.toLocaleDateString('en-US', { weekday: 'short' });
+      
+      dailyData[dateKey] = {
+        day: `${dayName} ${currentDate.getDate()}`,
+        date: dateKey,
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        water: 0
+      };
+    }
+    
+    // Process meals data - FIXED: Calculate nutrition if totalNutrition is missing
+    meals.forEach(meal => {
+      const dateKey = meal.date.toISOString().split('T')[0];
+      if (dailyData[dateKey]) {
+        let mealCalories = 0;
+        let mealProtein = 0;
+        let mealCarbs = 0;
+        let mealFat = 0;
+        let mealFiber = 0;
+        
+        // Use totalNutrition if available and valid
+        if (meal.totalNutrition && meal.totalNutrition.calories > 0) {
+          mealCalories = meal.totalNutrition.calories || 0;
+          mealProtein = meal.totalNutrition.protein || 0;
+          mealCarbs = meal.totalNutrition.carbs || 0;
+          mealFat = meal.totalNutrition.fat || 0;
+          mealFiber = meal.totalNutrition.fiber || 0;
+        } else if (meal.items && meal.items.length > 0) {
+          // Calculate nutrition from items
+          meal.items.forEach(item => {
+            let itemNutrition = {};
+            
+            if (item.foodItem) {
+              // Food item
+              itemNutrition = {
+                calories: item.foodItem.calories || 0,
+                protein: item.foodItem.protein || 0,
+                carbs: item.foodItem.carbs || 0,
+                fat: item.foodItem.fat || 0,
+                fiber: item.foodItem.fiber || 0
+              };
+            } else if (item.recipe && item.recipe.nutrition) {
+              // Recipe
+              itemNutrition = {
+                calories: item.recipe.nutrition.calories || 0,
+                protein: item.recipe.nutrition.protein || 0,
+                carbs: item.recipe.nutrition.carbs || 0,
+                fat: item.recipe.nutrition.fat || 0,
+                fiber: item.recipe.nutrition.fiber || 0
+              };
+            }
+            
+            const quantity = item.quantity || 1;
+            mealCalories += (itemNutrition.calories || 0) * quantity;
+            mealProtein += (itemNutrition.protein || 0) * quantity;
+            mealCarbs += (itemNutrition.carbs || 0) * quantity;
+            mealFat += (itemNutrition.fat || 0) * quantity;
+            mealFiber += (itemNutrition.fiber || 0) * quantity;
+          });
+        }
+        
+        dailyData[dateKey].calories += Math.round(mealCalories);
+        dailyData[dateKey].protein += Math.round(mealProtein * 100) / 100;
+        dailyData[dateKey].carbs += Math.round(mealCarbs * 100) / 100;
+        dailyData[dateKey].fat += Math.round(mealFat * 100) / 100;
+        dailyData[dateKey].fiber += Math.round(mealFiber * 100) / 100;
+      }
+    });
+    
+    // Process water intake data
+    waterIntakes.forEach(intake => {
+      const dateKey = intake.date.toISOString().split('T')[0];
+      if (dailyData[dateKey]) {
+        dailyData[dateKey].water += intake.amount || 0;
+      }
+    });
+    
+    // Convert to array and ensure proper data types
+    const weeklyData = Object.values(dailyData).map(day => ({
+      ...day,
+      calories: Math.round(day.calories),
+      protein: Math.round(day.protein * 10) / 10, // Keep 1 decimal place
+      carbs: Math.round(day.carbs * 10) / 10,
+      fat: Math.round(day.fat * 10) / 10,
+      fiber: Math.round(day.fiber * 10) / 10
+    }));
+    
+    // Sort by date
+    weeklyData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    
+    console.log('Weekly data calculated:', weeklyData);
+    
+    res.json({
+      success: true,
+      data: {
+        dailyData: weeklyData,
+        startDate: startDateObj.toISOString().split('T')[0],
+        endDate: endDate.toISOString().split('T')[0],
+        summary: {
+          totalCalories: weeklyData.reduce((sum, day) => sum + day.calories, 0),
+          averageCalories: Math.round(weeklyData.reduce((sum, day) => sum + day.calories, 0) / weeklyData.length),
+          daysTracked: weeklyData.filter(day => day.calories > 0).length
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Weekly calories report error:', error);
+    standardErrorResponse(res, 500, 'Failed to generate weekly calories report', error.message);
+  }
+});
+// Add this route to calculate daily totals
+app.get('/api/daily-totals', authenticate, async (req, res) => {
+  try {
+    const { date } = req.query;
+    const targetDate = date ? new Date(date) : new Date();
+    
+    const startOfDay = new Date(targetDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    
+    const endOfDay = new Date(targetDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    
+    // Get meals for the day
+    const meals = await Meal.find({
+      userId: req.user._id,
+      date: { $gte: startOfDay, $lte: endOfDay }
+    }).populate('items.foodItem').populate('items.recipe');
+    
+    // Get water intake for the day
+    const waterIntakes = await WaterIntake.find({
+      userId: req.user._id,
+      date: { $gte: startOfDay, $lte: endOfDay }
+    });
+    
+    // Calculate totals from meals
+    const totals = {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0
+    };
+    
+    meals.forEach(meal => {
+      if (meal.totalNutrition) {
+        totals.calories += Number(meal.totalNutrition.calories) || 0;
+        totals.protein += Number(meal.totalNutrition.protein) || 0;
+        totals.carbs += Number(meal.totalNutrition.carbs) || 0;
+        totals.fat += Number(meal.totalNutrition.fat) || 0;
+        totals.fiber += Number(meal.totalNutrition.fiber) || 0;
+      }
+    });
+    
+    // Calculate water total
+    const waterTotal = waterIntakes.reduce((sum, intake) => sum + intake.amount, 0);
+    
+    // Get goals
+    const goals = await NutritionalGoals.findOne({ userId: req.user._id }) || {
+      dailyCalories: 2000,
+      protein: 150,
+      carbs: 250,
+      fat: 67,
+      fiber: 25,
+      water: 2000
+    };
+    
+    res.json({
+      success: true,
+      data: {
+        date: targetDate.toISOString().split('T')[0],
+        totals: {
+          calories: Math.round(totals.calories),
+          protein: Math.round(totals.protein),
+          carbs: Math.round(totals.carbs),
+          fat: Math.round(totals.fat),
+          fiber: Math.round(totals.fiber),
+          water: waterTotal
+        },
+        goals: goals,
+        mealsCount: meals.length,
+        waterEntriesCount: waterIntakes.length
+      }
+    });
+    
+  } catch (error) {
+    console.error('Daily totals error:', error);
+    standardErrorResponse(res, 500, 'Failed to calculate daily totals', error.message);
+  }
+});
+    app.post('/api/water-intake', authenticate, async (req, res) => {
+        try {
+            const waterIntake = new WaterIntake({
+                ...req.body,
+                userId: req.user._id
+            });
+            
+            await waterIntake.save();
+            res.status(201).json({
+                success: true,
+                message: 'Water intake recorded successfully',
+                data: waterIntake
+            });
+        } catch (error) {
+            console.error('Create water intake error:', error);
+            standardErrorResponse(res, 500, 'Failed to create water intake entry', error.message);
+        }
+    });
+
+
+// Nutritional Goals Routes - FIXED
+    app.get('/api/nutritional-goals', authenticate, async (req, res) => {
+        try {
+            let goals = await NutritionalGoals.findOne({ userId: req.user._id });
+            
+            if (!goals) {
+                // Create default goals
+                goals = new NutritionalGoals({
+                    userId: req.user._id,
+                    dailyCalories: 2000,
+                    protein: 150,
+                    carbs: 250,
+                    fat: 67,
+                    fiber: 25,
+                    water: 2000
+                });
+                
+                await goals.save();
+            }
+            
+            res.json({
+                success: true,
+                data: goals
+            });
+        } catch (error) {
+            console.error('Get nutritional goals error:', error);
+            // Return default goals instead of error
+            res.json({
+                success: false,
+                message: 'Using default nutritional goals',
+                data: {
+                    dailyCalories: 2000,
+                    protein: 150,
+                    carbs: 250,
+                    fat: 67,
+                    fiber: 25,
+                    water: 2000,
+                    fromDefaults: true
+                }
+            });
+        }
+    });
+app.put('/api/nutritional-goals', authenticate, async (req, res) => {
+        try {
+            let goals = await NutritionalGoals.findOne({ userId: req.user._id });
+            
+            if (goals) {
+                goals.set(req.body);
+                await goals.save();
+            } else {
+                goals = new NutritionalGoals({
+                    ...req.body,
+                    userId: req.user._id
+                });
+                await goals.save();
+            }
+            
+            res.json({
+                success: true,
+                message: 'Nutritional goals updated successfully',
+                data: goals
+            });
+        } catch (error) {
+            console.error('Update nutritional goals error:', error);
+            standardErrorResponse(res, 500, 'Failed to update nutritional goals', error.message);
+        }
+    });
+
+  app.post('/api/nutritional-goals', authenticate, async (req, res) => {
+        try {
+            // Check if goals already exist
+            const existingGoals = await NutritionalGoals.findOne({ userId: req.user._id });
+            if (existingGoals) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Nutritional goals already exist for this user'
+                });
+            }
+            
+            const goals = new NutritionalGoals({
+                ...req.body,
+                userId: req.user._id
+            });
+            
+            await goals.save();
+            
+            res.status(201).json({
+                success: true,
+                message: 'Nutritional goals created successfully',
+                data: goals
+            });
+        } catch (error) {
+            console.error('Create nutritional goals error:', error);
+            standardErrorResponse(res, 500, 'Failed to create nutritional goals', error.message);
+        }
+    });
+
+// Reports Routes
+    app.get('/api/reports/daily', authenticate, async (req, res) => {
+        try {
+            const { date } = req.query;
+            const targetDate = date ? new Date(date) : new Date();
+            
+            const startOfDay = new Date(targetDate);
+            startOfDay.setHours(0, 0, 0, 0);
+            
+            const endOfDay = new Date(targetDate);
+            endOfDay.setHours(23, 59, 59, 999);
+            
+            // Get meals for the day
+            const meals = await Meal.find({
+                userId: req.user._id,
+                date: { $gte: startOfDay, $lte: endOfDay }
+            }).populate('items.foodItem').populate('items.recipe');
+            
+            // Get water intake for the day
+            const waterIntakes = await WaterIntake.find({
+                userId: req.user._id,
+                date: { $gte: startOfDay, $lte: endOfDay }
+            });
+            
+            // Calculate totals
+            const totalNutrition = meals.reduce((acc, meal) => ({
+                calories: acc.calories + (meal.totalNutrition?.calories || 0),
+                protein: acc.protein + (meal.totalNutrition?.protein || 0),
+                carbs: acc.carbs + (meal.totalNutrition?.carbs || 0),
+                fat: acc.fat + (meal.totalNutrition?.fat || 0),
+                fiber: acc.fiber + (meal.totalNutrition?.fiber || 0)
+            }), { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 });
+            
+            const totalWater = waterIntakes.reduce((sum, intake) => sum + intake.amount, 0);
+            
+            // Get goals
+            const goals = await NutritionalGoals.findOne({ userId: req.user._id }) || {
+                dailyCalories: 2000,
+                protein: 150,
+                carbs: 250,
+                fat: 67,
+                fiber: 25,
+                water: 2000
+            };
+            
+            res.json({
+                success: true,
+                data: {
+                    date: targetDate.toISOString().split('T')[0],
+                    meals: meals,
+                    waterIntakes: waterIntakes,
+                    totalNutrition: totalNutrition,
+                    totalWater: totalWater,
+                    goals: goals
+                }
+            });
+        } catch (error) {
+            console.error('Daily report error:', error);
+            standardErrorResponse(res, 500, 'Failed to generate daily report', error.message);
+        }
+    });
+// Ingredients Search API using USDA FoodData Central
+app.get('/api/ingredients/search', authenticate, async (req, res) => {
+  try {
+    const { query, pageSize = 10, pageNumber = 1 } = req.query;
+
+    if (!query || query.trim().length < 2) {
+      return standardErrorResponse(res, 400, 'Search query must be at least 2 characters long');
+    }
+
+    // Load API key from environment
+    const USDA_API_KEY = process.env.USDA_API_KEY;
+    if (!USDA_API_KEY) {
+      return standardErrorResponse(res, 500, 'USDA API key is not configured');
+    }
+
+    // Using USDA FoodData Central API
+    const response = await axios.get('https://api.nal.usda.gov/fdc/v1/foods/search', {
+      params: {
+        api_key: USDA_API_KEY,
+        query: query.trim(),
+        dataType: ['Foundation', 'SR Legacy'],
+        pageSize: Math.min(pageSize, 25),
+        pageNumber: pageNumber,
+        sortBy: 'dataType.keyword',
+        sortOrder: 'asc'
+      },
+      timeout: 10000
+    });
+
+    const ingredients = response.data.foods.map(food => {
+      const nutrients = food.foodNutrients || [];
+      const calories = nutrients.find(n => n.nutrientName === 'Energy')?.value || 0;
+      const protein = nutrients.find(n => n.nutrientName === 'Protein')?.value || 0;
+      const carbs = nutrients.find(n => n.nutrientName === 'Carbohydrate, by difference')?.value || 0;
+      const fat = nutrients.find(n => n.nutrientName === 'Total lipid (fat)')?.value || 0;
+      const fiber = nutrients.find(n => n.nutrientName === 'Fiber, total dietary')?.value || 0;
+
+      return {
+        id: food.fdcId,
+        name: food.description,
+        brand: food.brandOwner || 'Generic',
+        category: food.foodCategory || 'Unknown',
+        servingSize: food.servingSize || 100,
+        servingUnit: food.servingSizeUnit || 'g',
+        nutrition: {
+          calories: Math.round(calories),
+          protein: Math.round(protein * 10) / 10,
+          carbs: Math.round(carbs * 10) / 10,
+          fat: Math.round(fat * 10) / 10,
+          fiber: Math.round(fiber * 10) / 10
+        }
+      };
+    });
+
+    res.json({
+      success: true,
+      data: {
+        ingredients,
+        totalHits: response.data.totalHits,
+        currentPage: pageNumber,
+        totalPages: response.data.totalPages
+      }
+    });
+
+  } catch (error) {
+    console.error('Ingredients search error:', error);
+
+    try {
+      // Fallback to local food items if USDA API fails
+      const localFoods = await FoodItem.find({
+        name: { $regex: req.query.query, $options: 'i' },
+        $or: [{ isCustom: false }, { createdBy: req.user._id }]
+      }).limit(10);
+
+      const ingredients = localFoods.map(food => ({
+        id: food._id,
+        name: food.name,
+        brand: food.brand || 'Generic',
+        category: 'Local Database',
+        servingSize: 100,
+        servingUnit: 'g',
+        nutrition: {
+          calories: food.calories,
+          protein: food.protein,
+          carbs: food.carbs,
+          fat: food.fat,
+          fiber: food.fiber
+        }
+      }));
+
+      res.json({
+        success: true,
+        data: {
+          ingredients,
+          totalHits: ingredients.length,
+          currentPage: 1,
+          totalPages: 1,
+          fromLocal: true
+        }
+      });
+    } catch (fallbackError) {
+      standardErrorResponse(res, 500, 'Failed to search ingredients', error.message);
+    }
+  }
+});
+
+    app.get('/api/reports/weekly', authenticate, async (req, res) => {
+        try {
+            const { startDate } = req.query;
+            const start = startDate ? new Date(startDate) : new Date();
+            start.setHours(0, 0, 0, 0);
+            
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            end.setHours(23, 59, 59, 999);
+            
+            // Get meals for the week
+            const meals = await Meal.find({
+                userId: req.user._id,
+                date: { $gte: start, $lte: end }
+            }).populate('items.foodItem').populate('items.recipe');
+            
+            // Get water intake for the week
+            const waterIntakes = await WaterIntake.find({
+                userId: req.user._id,
+                date: { $gte: start, $lte: end }
+            });
+            
+            // Group by date
+            const dailyData = {};
+            for (let i = 0; i < 7; i++) {
+                const currentDate = new Date(start);
+                currentDate.setDate(start.getDate() + i);
+                const dateStr = currentDate.toISOString().split('T')[0];
+                
+                dailyData[dateStr] = {
+                    date: dateStr,
+                    meals: [],
+                    totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 },
+                    totalWater: 0
+                };
+            }
+            
+            // Process meals
+            meals.forEach(meal => {
+                const dateStr = meal.date.toISOString().split('T')[0];
+                if (dailyData[dateStr]) {
+                    dailyData[dateStr].meals.push(meal);
+                    dailyData[dateStr].totalNutrition.calories += meal.totalNutrition?.calories || 0;
+                    dailyData[dateStr].totalNutrition.protein += meal.totalNutrition?.protein || 0;
+                    dailyData[dateStr].totalNutrition.carbs += meal.totalNutrition?.carbs || 0;
+                    dailyData[dateStr].totalNutrition.fat += meal.totalNutrition?.fat || 0;
+                    dailyData[dateStr].totalNutrition.fiber += meal.totalNutrition?.fiber || 0;
+                }
+            });
+            
+            // Process water intakes
+            waterIntakes.forEach(intake => {
+                const dateStr = intake.date.toISOString().split('T')[0];
+                if (dailyData[dateStr]) {
+                    dailyData[dateStr].totalWater += intake.amount;
+                }
+            });
+            
+            // Get goals
+            const goals = await NutritionalGoals.findOne({ userId: req.user._id }) || {
+                dailyCalories: 2000,
+                protein: 150,
+                carbs: 250,
+                fat: 67,
+                fiber: 25,
+                water: 2000
+            };
+            
+            res.json({
+                success: true,
+                data: {
+                    startDate: start.toISOString().split('T')[0],
+                    endDate: end.toISOString().split('T')[0],
+                    dailyData: Object.values(dailyData),
+                    goals: goals
+                }
+            });
+        } catch (error) {
+            console.error('Weekly report error:', error);
+            standardErrorResponse(res, 500, 'Failed to generate weekly report', error.message);
+        }
+    });
+// Weight Tracking Routes
+app.get('/api/weight-tracking', authenticate, async (req, res) => {
+  try {
+    const { startDate, endDate, limit = 30 } = req.query;
+    let query = { userId: req.user._id };
+    
+    if (startDate && endDate) {
+      query.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+    
+    const weights = await WeightTracking.find(query)
+      .sort({ date: -1 })
+      .limit(parseInt(limit));
+    
+    res.json(weights);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.post('/api/weight-tracking', authenticate, async (req, res) => {
+  try {
+    const weightEntry = new WeightTracking({
+      ...req.body,
+      userId: req.user._id
+    });
+    
+    await weightEntry.save();
+    res.status(201).json(weightEntry);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+app.get('/api/meal-plan-templates', authenticate, async (req, res) => {
+  try {
+    const templates = await MealPlanTemplate.find({ isPublic: true });
+    res.json({
+      success: true,
+      data: templates
+    });
+  } catch (error) {
+    console.error('Get meal plan templates error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to retrieve meal plan templates' 
+    });
+  }
+});
+
+// GET /api/weekly-meal-plans - Get weekly meal plan for current week
+app.get('/api/weekly-meal-plans', authenticate, async (req, res) => {
+  try {
+    const { weekStartDate } = req.query;
+    
+    // Calculate week start (Monday) and end (Sunday)
+    let startDate;
+    if (weekStartDate) {
+      startDate = new Date(weekStartDate);
+    } else {
+      startDate = new Date();
+      // Get Monday of current week
+      const day = startDate.getDay();
+      const diff = startDate.getDate() - day + (day === 0 ? -6 : 1);
+      startDate.setDate(diff);
+    }
+    
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Find existing meal plan for this week
+    let mealPlan = await WeeklyMealPlan.findOne({
+      userId: req.user._id,
+      weekStartDate: { $gte: startDate, $lte: endDate }
+    });
+
+    // If no meal plan exists, create an empty one
+    if (!mealPlan) {
+      const days = [];
+      const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+      
+      for (let i = 0; i < 7; i++) {
+        const currentDate = new Date(startDate);
+        currentDate.setDate(startDate.getDate() + i);
+        
+        days.push({
+          day: dayNames[i],
+          date: currentDate,
+          meals: [
+            { mealType: 'breakfast', name: '', items: [], totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+            { mealType: 'lunch', name: '', items: [], totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+            { mealType: 'dinner', name: '', items: [], totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 } }
+          ]
+        });
+      }
+
+      mealPlan = new WeeklyMealPlan({
+        userId: req.user._id,
+        weekStartDate: startDate,
+        weekEndDate: endDate,
+        days: days
+      });
+      
+      await mealPlan.save();
+    }
+
+    res.json({
+      success: true,
+      data: mealPlan
+    });
+  } catch (error) {
+    console.error('Get weekly meal plan error:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: 'Failed to retrieve weekly meal plan' 
+    });
+  }
+});
+app.put('/api/weekly-meal-plans/:day/:mealType', authenticate, async (req, res) => {
+  try {
+    const { day, mealType } = req.params;
+    const { name, items } = req.body;
+
+    // Calculate nutrition totals
+    let totalCalories = 0;
+    let totalProtein = 0;
+    let totalCarbs = 0;
+    let totalFat = 0;
+
+    if (items && items.length > 0) {
+      items.forEach(item => {
+        totalCalories += item.nutrition?.calories || 0;
+        totalProtein += item.nutrition?.protein || 0;
+        totalCarbs += item.nutrition?.carbs || 0;
+        totalFat += item.nutrition?.fat || 0;
+      });
+    }
+
+    const totalNutrition = {
+      calories: Math.round(totalCalories),
+      protein: Math.round(totalProtein * 100) / 100,
+      carbs: Math.round(totalCarbs * 100) / 100,
+      fat: Math.round(totalFat * 100) / 100
+    };
+
+    // Find current week's meal plan
+    const startDate = new Date();
+    const dayOfWeek = startDate.getDay();
+    const diff = startDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    startDate.setDate(diff);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+
+    let mealPlan = await WeeklyMealPlan.findOne({
+      userId: req.user._id,
+      weekStartDate: { $gte: startDate, $lte: endDate }
+    });
+
+    if (!mealPlan) {
+      return res.status(404).json({
+        success: false,
+        message: 'Meal plan not found for this week'
+      });
+    }
+
+    // Update the specific meal
+    const dayIndex = mealPlan.days.findIndex(d => d.day === day.toLowerCase());
+    if (dayIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Day not found'
+      });
+    }
+
+    const mealIndex = mealPlan.days[dayIndex].meals.findIndex(m => m.mealType === mealType.toLowerCase());
+    if (mealIndex === -1) {
+      return res.status(404).json({
+        success: false,
+        message: 'Meal type not found'
+      });
+    }
+
+    mealPlan.days[dayIndex].meals[mealIndex] = {
+      mealType: mealType.toLowerCase(),
+      name: name || '',
+      items: items || [],
+      totalNutrition
+    };
+
+    mealPlan.markModified('days');
+    await mealPlan.save();
+
+    res.json({
+      success: true,
+      message: 'Meal updated successfully',
+      data: mealPlan
+    });
+  } catch (error) {
+    console.error('Update meal error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update meal'
+    });
+  }
+});
+
+// POST /api/weekly-meal-plans/generate-from-template - Generate meal plan from template
+app.post('/api/weekly-meal-plans/generate-from-template', authenticate, async (req, res) => {
+  try {
+    const { templateId } = req.body;
+
+    const template = await MealPlanTemplate.findById(templateId);
+    if (!template) {
+      return res.status(404).json({
+        success: false,
+        message: 'Template not found'
+      });
+    }
+
+    // Calculate week dates
+    const startDate = new Date();
+    const dayOfWeek = startDate.getDay();
+    const diff = startDate.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    startDate.setDate(diff);
+    startDate.setHours(0, 0, 0, 0);
+    
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Create days array with template meals
+    const days = [];
+    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(startDate);
+      currentDate.setDate(startDate.getDate() + i);
+      const dayName = dayNames[i];
+      
+      // Get template meals for this day
+      const templateMeals = template.meals.filter(meal => meal.day === dayName);
+      
+      const meals = [
+        { mealType: 'breakfast', name: '', items: [], totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+        { mealType: 'lunch', name: '', items: [], totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 } },
+        { mealType: 'dinner', name: '', items: [], totalNutrition: { calories: 0, protein: 0, carbs: 0, fat: 0 } }
+      ];
+
+      // Apply template meals
+      templateMeals.forEach(templateMeal => {
+        const mealIndex = meals.findIndex(m => m.mealType === templateMeal.mealType);
+        if (mealIndex !== -1) {
+          meals[mealIndex] = {
+            mealType: templateMeal.mealType,
+            name: templateMeal.name,
+            items: templateMeal.items,
+            totalNutrition: {
+              calories: Math.round(templateMeal.items.reduce((sum, item) => sum + (item.nutrition?.calories || 0), 0)),
+              protein: Math.round(templateMeal.items.reduce((sum, item) => sum + (item.nutrition?.protein || 0), 0) * 100) / 100,
+              carbs: Math.round(templateMeal.items.reduce((sum, item) => sum + (item.nutrition?.carbs || 0), 0) * 100) / 100,
+              fat: Math.round(templateMeal.items.reduce((sum, item) => sum + (item.nutrition?.fat || 0), 0) * 100) / 100
+            }
+          };
+        }
+      });
+
+      days.push({
+        day: dayName,
+        date: currentDate,
+        meals
+      });
+    }
+
+    // Find and update existing meal plan or create new one
+    let mealPlan = await WeeklyMealPlan.findOne({
+      userId: req.user._id,
+      weekStartDate: { $gte: startDate, $lte: endDate }
+    });
+
+    if (mealPlan) {
+      mealPlan.days = days;
+      mealPlan.markModified('days');
+    } else {
+      mealPlan = new WeeklyMealPlan({
+        userId: req.user._id,
+        weekStartDate: startDate,
+        weekEndDate: endDate,
+        days
+      });
+    }
+
+    await mealPlan.save();
+
+    res.json({
+      success: true,
+      message: 'Meal plan generated from template successfully',
+      data: mealPlan
+    });
+  } catch (error) {
+    console.error('Generate meal plan from template error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to generate meal plan from template'
+    });
+  }
+});
+
+// Seed some default templates
+app.post('/api/meal-plan-templates/seed', authenticate, async (req, res) => {
+  try {
+    const templates = [
+      {
+        name: 'High Protein Plan',
+        description: 'High protein diet for muscle building',
+        dailyCalories: 2200,
+        protein: 180,
+        carbs: 200,
+        fat: 60,
+        meals: [
+          {
+            day: 'monday',
+            mealType: 'breakfast',
+            name: 'Protein Power Bowl',
+            items: [
+              { name: 'Greek Yogurt', quantity: '1 cup', nutrition: { calories: 150, protein: 25, carbs: 8, fat: 4 } },
+              { name: 'Protein Powder', quantity: '1 scoop', nutrition: { calories: 120, protein: 24, carbs: 3, fat: 1 } },
+              { name: 'Berries', quantity: '1/2 cup', nutrition: { calories: 40, protein: 0, carbs: 10, fat: 0 } }
+            ]
+          }
+        ],
+        isPublic: true
+      },
+      {
+        name: 'Balanced Diet',
+        description: 'Well-balanced meal plan for maintenance',
+        dailyCalories: 2000,
+        protein: 150,
+        carbs: 250,
+        fat: 67,
+        meals: [
+          {
+            day: 'tuesday',
+            mealType: 'lunch',
+            name: 'Salmon Avocado Bowl',
+            items: [
+              { name: 'Salmon', quantity: '150g', nutrition: { calories: 280, protein: 25, carbs: 0, fat: 18 } },
+              { name: 'Avocado', quantity: '1/2', nutrition: { calories: 160, protein: 2, carbs: 8, fat: 15 } },
+              { name: 'Brown Rice', quantity: '1 cup', nutrition: { calories: 215, protein: 5, carbs: 45, fat: 2 } }
+            ]
+          }
+        ],
+        isPublic: true
+      },
+      {
+        name: 'Low Carb Plan',
+        description: 'Low carbohydrate diet for weight loss',
+        dailyCalories: 1800,
+        protein: 160,
+        carbs: 100,
+        fat: 80,
+        meals: [],
+        isPublic: true
+      }
+    ];
+
+    await MealPlanTemplate.deleteMany({ isPublic: true });
+    await MealPlanTemplate.insertMany(templates);
+
+    res.json({
+      success: true,
+      message: 'Default templates seeded successfully'
+    });
+  } catch (error) {
+    console.error('Seed templates error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to seed templates'
+    });
+  }
+});
+
+app.post('/api/meal-plan-templates', authenticate, async (req, res) => {
+  try {
+    const template = new MealPlanTemplate({
+      ...req.body,
+      userId: req.user._id
+    });
+    
+    await template.save();
+    await template.populate('meals.items.foodItem');
+    await template.populate('meals.items.recipe');
+    res.status(201).json(template);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+// Enhanced Recipe Routes with proper error handling
+app.get('/api/recipes/:id', authenticate, async (req, res) => {
+  try {
+    const recipe = await Recipe.findOne({
+      _id: req.params.id,
+      $or: [{ createdBy: req.user._id }, { isPublic: true }]
+    }).populate('ingredients.foodItem');
+    
+    if (!recipe) {
+      return standardErrorResponse(res, 404, 'Recipe not found');
+    }
+    
+    res.json({
+      success: true,
+      data: recipe
+    });
+  } catch (error) {
+    console.error('Get recipe error:', error);
+    standardErrorResponse(res, 500, 'Failed to retrieve recipe', error.message);
+  }
+});
+
+
+app.put('/api/recipes/:id', authenticate, async (req, res) => {
+  try {
+    const recipe = await Recipe.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        createdBy: req.user._id
+      },
+      req.body,
+      { new: true, runValidators: true }
+    ).populate('ingredients.foodItem');
+    
+    if (!recipe) {
+      return standardErrorResponse(res, 404, 'Recipe not found');
+    }
+    
+    res.json({
+      success: true,
+      message: 'Recipe updated successfully',
+      data: recipe
+    });
+  } catch (error) {
+    console.error('Update recipe error:', error);
+    standardErrorResponse(res, 500, 'Failed to update recipe', error.message);
+  }
+});
+
+app.delete('/api/recipes/:id', authenticate, async (req, res) => {
+  try {
+    const recipe = await Recipe.findOneAndDelete({
+      _id: req.params.id,
+      createdBy: req.user._id
+    });
+    
+    if (!recipe) {
+      return standardErrorResponse(res, 404, 'Recipe not found');
+    }
+    
+    res.json({
+      success: true,
+      message: 'Recipe deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete recipe error:', error);
+    standardErrorResponse(res, 500, 'Failed to delete recipe', error.message);
+  }
+});
+// Generate Meal Plan from Template
+app.post('/api/generate-meal-plan', authenticate, async (req, res) => {
+  try {
+    const { templateId, startDate } = req.body;
+    const template = await MealPlanTemplate.findById(templateId)
+      .populate('meals.items.foodItem')
+      .populate('meals.items.recipe');
+    
+    if (!template) {
+      return res.status(404).json({ message: 'Template not found' });
+    }
+    
+    const start = new Date(startDate);
+    const mealsToCreate = [];
+    
+    template.meals.forEach(meal => {
+      const mealDate = new Date(start);
+      const dayOffset = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+        .indexOf(meal.day);
+      
+      mealDate.setDate(start.getDate() + dayOffset);
+      
+      const newMeal = new Meal({
+        userId: req.user._id,
+        name: `${meal.mealType} - ${template.name}`,
+        type: meal.mealType,
+        items: meal.items,
+        date: mealDate,
+        time: '12:00' // Default time
+      });
+      
+      mealsToCreate.push(newMeal);
+    });
+    
+    const createdMeals = await Meal.insertMany(mealsToCreate);
+    res.json(createdMeals);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+// Health Profile Integration
+app.get('/api/health-profile', authenticate, async (req, res) => {
+  try {
+    const healthProfile = await HealthProfile.findOne({ userId: req.user._id });
+    res.json(healthProfile);
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Dietary Recommendations
+app.get('/api/recommendations', authenticate, async (req, res) => {
+  try {
+    const healthProfile = await HealthProfile.findOne({ userId: req.user._id });
+    const goals = await NutritionalGoals.findOne({ userId: req.user._id });
+    
+    if (!healthProfile || !goals) {
+      return res.json({ recommendations: [] });
+    }
+    
+    const recommendations = [];
+    
+    // Example recommendations based on health profile
+    if (healthProfile.healthGoal === 'Weight Loss') {
+      recommendations.push({
+        type: 'goal',
+        message: 'Consider a moderate calorie deficit of 500 calories per day for sustainable weight loss',
+        priority: 'high'
+      });
+    }
+    
+    if (healthProfile.allergies && healthProfile.allergies.length > 0) {
+      recommendations.push({
+        type: 'safety',
+        message: `Be mindful of your allergies: ${healthProfile.allergies.join(', ')}`,
+        priority: 'high'
+      });
+    }
+    
+    if (healthProfile.conditions && healthProfile.conditions.includes('Diabetes')) {
+      recommendations.push({
+        type: 'health',
+        message: 'Focus on low glycemic index foods and consistent carbohydrate intake',
+        priority: 'high'
+      });
+    }
+    
+    res.json({ recommendations });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// APPOINTMENT ROUTES
+
+// GET /api/appointments - Get all appointments for authenticated user
+app.get('/api/appointments', authenticate, async (req, res) => {
+  try {
+    const { status, search, sortBy = 'date', sortOrder = 'asc', page = 1, limit = 50 } = req.query;
+    
+    let query = {
+      userId: req.user._id,
+      userEmail: req.user.email,
+      isActive: true
+    };
+    
+    // Filter by status
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    
+    // Search functionality
+    if (search) {
+      const searchRegex = new RegExp(search, 'i');
+      query.$or = [
+        { patientName: searchRegex },
+        { doctorName: searchRegex },
+        { specialty: searchRegex },
+        { clinic: searchRegex }
+      ];
+    }
+    
+    // Sort options
+    const sortOptions = {};
+    if (sortBy === 'date') {
+      sortOptions.date = sortOrder === 'desc' ? -1 : 1;
+      sortOptions.time = sortOrder === 'desc' ? -1 : 1;
+    } else {
+      sortOptions[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    }
+    
+    const appointments = await Appointment.find(query)
+      .sort(sortOptions)
+      .limit(limit * 1)
+      .skip((page - 1) * limit);
+    
+    const total = await Appointment.countDocuments(query);
+    
+    res.json({
+      success: true,
+      appointments,
+      totalPages: Math.ceil(total / limit),
+      currentPage: page,
+      total
+    });
+  } catch (err) {
+    console.error('Get appointments error:', err);
+    standardErrorResponse(res, 500, 'Failed to retrieve appointments', err.message);
+  }
+});
+
+// GET /api/appointments/:id - Get specific appointment
+app.get('/api/appointments/:id', authenticate, async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+      userEmail: req.user.email,
+      isActive: true
+    });
+    
+    if (!appointment) {
+      return standardErrorResponse(res, 404, 'Appointment not found');
+    }
+    
+    res.json({ success: true, appointment });
+  } catch (err) {
+    console.error('Get appointment error:', err);
+    standardErrorResponse(res, 500, 'Failed to retrieve appointment', err.message); // FIXED
+  }
+});
+
+// POST /api/appointments - Create new appointment
+app.post('/api/appointments', authenticate, async (req, res) => {
+  try {
+    const appointmentData = {
+      ...req.body,
+      userId: req.user._id,
+      userEmail: req.user.email
+    };
+    
+    // Validate appointment date is not in the past
+    const appointmentDate = new Date(appointmentData.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+     if (appointmentData.date) {
+      appointmentData.date = convertToUTC(appointmentData.date);
+    }
+    if (appointmentDate < today) {
+      return standardErrorResponse(res, 400, 'Appointment date cannot be in the past');
+    }
+    
+    // Check for conflicting appointments
+    const conflictingAppointment = await Appointment.findOne({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      date: appointmentData.date,
+      time: appointmentData.time,
+      status: { $ne: 'cancelled' },
+      isActive: true
+    });
+    
+    if (conflictingAppointment) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'You already have an appointment at this date and time' 
+      });
+    }
+    
+    const appointment = new Appointment(appointmentData);
+    await appointment.save();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Appointment scheduled successfully!',
+      appointment
+    });
+  } catch (err) {
+    console.error('Create appointment error:', err);
+    if (err.name === 'ValidationError') {
+      const errors = {};
+      Object.keys(err.errors).forEach(key => {
+        errors[key] = err.errors[key].message;
+      });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Validation error', 
+        errors 
+      });
+    }
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/appointments/:id - Update appointment
+app.put('/api/appointments/:id', authenticate, async (req, res) => {
+  try {
+    const appointment = await Appointment.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+      userEmail: req.user.email,
+      isActive: true
+    });
+    
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    // Validate appointment date is not in the past
+    if (req.body.date) {
+      const appointmentDate = new Date(req.body.date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (appointmentDate < today) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Appointment date cannot be in the past' 
+        });
+      }
+    }
+    
+    // Check for conflicting appointments (exclude current appointment)
+    if (req.body.date || req.body.time) {
+      const checkDate = req.body.date || appointment.date;
+      const checkTime = req.body.time || appointment.time;
+      
+      const conflictingAppointment = await Appointment.findOne({
+        _id: { $ne: req.params.id },
+        userId: req.user._id,
+        userEmail: req.user.email,
+        date: checkDate,
+        time: checkTime,
+        status: { $ne: 'cancelled' },
+        isActive: true
+      });
+      
+      if (conflictingAppointment) {
+        return res.status(400).json({ 
+          success: false,
+          message: 'You already have another appointment at this date and time' 
+        });
+      }
+    }
+    
+    Object.keys(req.body).forEach(key => {
+      appointment[key] = req.body[key];
+    });
+    
+    // Reset reminder if date/time changed
+    if (req.body.date || req.body.time) {
+      appointment.reminderSent = false;
+      appointment.lastReminderSent = undefined;
+    }
+    if (req.body.date) {
+      req.body.date = convertToUTC(req.body.date);
+    }
+    await appointment.save();
+    
+    res.json({
+      success: true,
+      message: 'Appointment updated successfully!',
+      appointment
+    });
+  } catch (err) {
+    console.error('Update appointment error:', err);
+    if (err.name === 'ValidationError') {
+      const errors = {};
+      Object.keys(err.errors).forEach(key => {
+        errors[key] = err.errors[key].message;
+      });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Validation error', 
+        errors 
+      });
+    }
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PATCH /api/appointments/:id/status - Update appointment status
+app.patch('/api/appointments/:id/status', authenticate, async (req, res) => {
+  try {
+    const { status } = req.body;
+    
+    if (!['pending', 'confirmed', 'completed', 'cancelled'].includes(status)) {
+      return res.status(400).json({ success: false, message: 'Invalid status' });
+    }
+    
+    const appointment = await Appointment.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.user._id,
+        userEmail: req.user.email,
+        isActive: true
+      },
+      { status },
+      { new: true }
+    );
+    
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: `Appointment ${status}!`,
+      appointment
+    });
+  } catch (err) {
+    console.error('Update appointment status error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/appointments/:id - Delete appointment (soft delete)
+app.delete('/api/appointments/:id', authenticate, async (req, res) => {
+  try {
+    const appointment = await Appointment.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.user._id,
+        userEmail: req.user.email,
+        isActive: true
+      },
+      { isActive: false },
+      { new: true }
+    );
+    
+    if (!appointment) {
+      return res.status(404).json({ success: false, message: 'Appointment not found' });
+    }
+    
+    res.json({ success: true, message: 'Appointment deleted successfully!' });
+  } catch (err) {
+    console.error('Delete appointment error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/appointments/reminders/active - Get active reminders
+app.get('/api/appointments/reminders/active', authenticate, async (req, res) => {
+  try {
+    const now = new Date();
+    const twoDaysFromNow = new Date(now.getTime() + (48 * 60 * 60 * 1000));
+    
+    const appointments = await Appointment.find({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      reminderSet: true,
+      status: 'confirmed',
+      isActive: true,
+      date: { $gte: now, $lte: twoDaysFromNow }
+    }).sort({ date: 1, time: 1 });
+    
+    const activeReminders = appointments.filter(appointment => 
+      appointment.shouldSendReminder()
+    );
+    
+    res.json({ success: true, reminders: activeReminders });
+  } catch (err) {
+    console.error('Get active reminders error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// GET /api/appointments/settings/reminders - Get reminder settings
+app.get('/api/appointments/settings/reminders', authenticate, async (req, res) => {
+  try {
+    let settings = await ReminderSettings.findOne({ 
+      userId: req.user._id,
+      userEmail: req.user.email 
+    });
+    
+    if (!settings) {
+      settings = new ReminderSettings({
+        userId: req.user._id,
+        userEmail: req.user.email,
+        emailAddress: req.user.email,
+        defaultReminderTimes: ['1 day before'],
+        notificationMethods: {
+          browser: true,
+          email: true,
+          sms: false
+        }
+      });
+      await settings.save();
+    }
+    
+    res.json({ success: true, settings });
+  } catch (err) {
+    console.error('Get reminder settings error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// PUT /api/appointments/settings/reminders - Update reminder settings
+app.put('/api/appointments/settings/reminders', authenticate, async (req, res) => {
+  try {
+    const settings = await ReminderSettings.findOneAndUpdate(
+      { 
+        userId: req.user._id,
+        userEmail: req.user.email 
+      },
+      {
+        ...req.body,
+        userId: req.user._id,
+        userEmail: req.user.email
+      },
+      { new: true, upsert: true }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Reminder settings updated successfully!',
+      settings
+    });
+  } catch (err) {
+    console.error('Update reminder settings error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/appointments/by-date/:date - Get appointments for specific date
+app.get('/api/appointments/by-date/:date', authenticate, async (req, res) => {
+  try {
+    const { date } = req.params;
+    
+    // Create start and end of day in UTC
+    const startDate = new Date(date);
+    startDate.setUTCHours(0, 0, 0, 0);
+    
+    const endDate = new Date(date);
+    endDate.setUTCHours(23, 59, 59, 999);
+
+    const appointments = await Appointment.find({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      date: {
+        $gte: startDate,
+        $lt: endDate
+      },
+      isActive: true
+    }).sort({ time: 1 });
+    
+    res.json({ success: true, appointments, date: date });
+  } catch (err) {
+    console.error('Get appointments by date error:', err);
+    standardErrorResponse(res, 500, 'Failed to retrieve appointments', err.message);
+  }
+});
+// Meal Plan Routes
+app.get('/api/meal-plans', authenticate, async (req, res) => {
+  try {
+    const { active } = req.query;
+    let query = { userId: req.user._id, isActive: true };
+    
+    if (active === 'true') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      query.endDate = { $gte: today };
+    }
+    
+    const mealPlans = await MealPlan.find(query)
+      .populate('days.meals.items.foodItem')
+      .populate('days.meals.items.recipe')
+      .sort({ startDate: -1 });
+    
+    res.json({
+      success: true,
+      data: mealPlans
+    });
+  } catch (error) {
+    console.error('Get meal plans error:', error);
+    standardErrorResponse(res, 500, 'Failed to retrieve meal plans', error.message);
+  }
+});
+
+app.get('/api/meal-plans/:id', authenticate, async (req, res) => {
+  try {
+    const mealPlan = await MealPlan.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+      isActive: true
+    })
+    .populate('days.meals.items.foodItem')
+    .populate('days.meals.items.recipe');
+    
+    if (!mealPlan) {
+      return standardErrorResponse(res, 404, 'Meal plan not found');
+    }
+    
+    res.json({
+      success: true,
+      data: mealPlan
+    });
+  } catch (error) {
+    console.error('Get meal plan error:', error);
+    standardErrorResponse(res, 500, 'Failed to retrieve meal plan', error.message);
+  }
+});
+
+app.post('/api/meal-plans', authenticate, async (req, res) => {
+  try {
+    const mealPlan = new MealPlan({
+      ...req.body,
+      userId: req.user._id
+    });
+    
+    await mealPlan.save();
+    await mealPlan.populate('days.meals.items.foodItem');
+    await mealPlan.populate('days.meals.items.recipe');
+    
+    res.status(201).json({
+      success: true,
+      message: 'Meal plan created successfully',
+      data: mealPlan
+    });
+  } catch (error) {
+    console.error('Create meal plan error:', error);
+    standardErrorResponse(res, 500, 'Failed to create meal plan', error.message);
+  }
+});
+
+app.put('/api/meal-plans/:id', authenticate, async (req, res) => {
+  try {
+    const mealPlan = await MealPlan.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.user._id,
+        isActive: true
+      },
+      req.body,
+      { new: true, runValidators: true }
+    )
+    .populate('days.meals.items.foodItem')
+    .populate('days.meals.items.recipe');
+    
+    if (!mealPlan) {
+      return standardErrorResponse(res, 404, 'Meal plan not found');
+    }
+    
+    res.json({
+      success: true,
+      message: 'Meal plan updated successfully',
+      data: mealPlan
+    });
+  } catch (error) {
+    console.error('Update meal plan error:', error);
+    standardErrorResponse(res, 500, 'Failed to update meal plan', error.message);
+  }
+});
+
+app.delete('/api/meal-plans/:id', authenticate, async (req, res) => {
+  try {
+    const mealPlan = await MealPlan.findOneAndUpdate(
+      {
+        _id: req.params.id,
+        userId: req.user._id,
+        isActive: true
+      },
+      { isActive: false },
+      { new: true }
+    );
+    
+    if (!mealPlan) {
+      return standardErrorResponse(res, 404, 'Meal plan not found');
+    }
+    
+    res.json({
+      success: true,
+      message: 'Meal plan deleted successfully'
+    });
+  } catch (error) {
+    console.error('Delete meal plan error:', error);
+    standardErrorResponse(res, 500, 'Failed to delete meal plan', error.message);
+  }
+});
+
+// Generate Meal Plan from Template
+app.post('/api/meal-plans/generate-from-template', authenticate, async (req, res) => {
+  try {
+    const { templateId, startDate, name } = req.body;
+    
+    // Get template (you can create template endpoints similarly)
+    const template = await MealPlanTemplate.findById(templateId)
+      .populate('meals.items.foodItem')
+      .populate('meals.items.recipe');
+    
+    if (!template) {
+      return standardErrorResponse(res, 404, 'Template not found');
+    }
+    
+    const start = new Date(startDate);
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6); // 7-day plan
+    
+    // Create days array
+    const days = [];
+    const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
+    
+    for (let i = 0; i < 7; i++) {
+      const currentDate = new Date(start);
+      currentDate.setDate(start.getDate() + i);
+      
+      const dayMeals = template.meals
+        .filter(meal => meal.day === dayNames[i])
+        .map(meal => ({
+          mealType: meal.mealType,
+          items: meal.items.map(item => ({
+            foodItem: item.foodItem?._id,
+            recipe: item.recipe?._id,
+            name: item.foodItem?.name || item.recipe?.name || 'Custom Item',
+            quantity: item.quantity || 1,
+            unit: item.unit || 'serving',
+            nutrition: {
+              calories: item.foodItem?.calories || item.recipe?.nutrition?.calories || 0,
+              protein: item.foodItem?.protein || item.recipe?.nutrition?.protein || 0,
+              carbs: item.foodItem?.carbs || item.recipe?.nutrition?.carbs || 0,
+              fat: item.foodItem?.fat || item.recipe?.nutrition?.fat || 0,
+              fiber: item.foodItem?.fiber || item.recipe?.nutrition?.fiber || 0
+            }
+          })),
+          totalNutrition: {
+            calories: Math.round(meal.items.reduce((sum, item) => 
+              sum + ((item.foodItem?.calories || item.recipe?.nutrition?.calories || 0) * (item.quantity || 1)), 0)),
+            protein: Math.round(meal.items.reduce((sum, item) => 
+              sum + ((item.foodItem?.protein || item.recipe?.nutrition?.protein || 0) * (item.quantity || 1)), 0) * 100) / 100,
+            carbs: Math.round(meal.items.reduce((sum, item) => 
+              sum + ((item.foodItem?.carbs || item.recipe?.nutrition?.carbs || 0) * (item.quantity || 1)), 0) * 100) / 100,
+            fat: Math.round(meal.items.reduce((sum, item) => 
+              sum + ((item.foodItem?.fat || item.recipe?.nutrition?.fat || 0) * (item.quantity || 1)), 0) * 100) / 100,
+            fiber: Math.round(meal.items.reduce((sum, item) => 
+              sum + ((item.foodItem?.fiber || item.recipe?.nutrition?.fiber || 0) * (item.quantity || 1)), 0) * 100) / 100
+          }
+        }));
+      
+      days.push({
+        day: dayNames[i],
+        date: currentDate,
+        meals: dayMeals
+      });
+    }
+    
+    const mealPlan = new MealPlan({
+      userId: req.user._id,
+      name: name || `${template.name} - ${startDate}`,
+      description: `Generated from template: ${template.name}`,
+      startDate: start,
+      endDate: end,
+      days: days
+    });
+    
+    await mealPlan.save();
+    await mealPlan.populate('days.meals.items.foodItem');
+    await mealPlan.populate('days.meals.items.recipe');
+    
+    res.status(201).json({
+      success: true,
+      message: 'Meal plan generated successfully',
+      data: mealPlan
+    });
+  } catch (error) {
+    console.error('Generate meal plan error:', error);
+    standardErrorResponse(res, 500, 'Failed to generate meal plan', error.message);
+  }
+});
+
+// Shopping List Routes
+app.get('/api/shopping-lists', authenticate, async (req, res) => {
+  try {
+    const shoppingLists = await ShoppingList.find({
+      userId: req.user._id,
+      isActive: true
+    }).populate('mealPlanId');
+    
+    res.json({
+      success: true,
+      data: shoppingLists
+    });
+  } catch (error) {
+    console.error('Get shopping lists error:', error);
+    standardErrorResponse(res, 500, 'Failed to retrieve shopping lists', error.message);
+  }
+});
+
+app.post('/api/shopping-lists/generate-from-meal-plan', authenticate, async (req, res) => {
+  try {
+    const { mealPlanId, name } = req.body;
+    
+    const mealPlan = await MealPlan.findOne({
+      _id: mealPlanId,
+      userId: req.user._id,
+      isActive: true
+    })
+    .populate('days.meals.items.foodItem')
+    .populate('days.meals.items.recipe');
+    
+    if (!mealPlan) {
+      return standardErrorResponse(res, 404, 'Meal plan not found');
+    }
+    
+    // Aggregate ingredients from meal plan
+    const ingredientMap = new Map();
+    
+    mealPlan.days.forEach(day => {
+      day.meals.forEach(meal => {
+        meal.items.forEach(item => {
+          const itemName = item.foodItem?.name || item.recipe?.name || item.name;
+          const key = itemName.toLowerCase();
+          
+          if (ingredientMap.has(key)) {
+            const existing = ingredientMap.get(key);
+            existing.quantity += item.quantity || 1;
+          } else {
+            ingredientMap.set(key, {
+              name: itemName,
+              category: 'pantry', // You can enhance this with category detection
+              quantity: item.quantity || 1,
+              unit: item.unit || 'serving',
+              estimatedCost: 0, // You can add cost estimation logic
+              purchased: false
+            });
+          }
+        });
+      });
+    });
+    
+    const shoppingList = new ShoppingList({
+      userId: req.user._id,
+      mealPlanId: mealPlanId,
+      name: name || `Shopping for ${mealPlan.name}`,
+      items: Array.from(ingredientMap.values())
+    });
+    
+    await shoppingList.save();
+    
+    res.status(201).json({
+      success: true,
+      message: 'Shopping list generated successfully',
+      data: shoppingList
+    });
+  } catch (error) {
+    console.error('Generate shopping list error:', error);
+    standardErrorResponse(res, 500, 'Failed to generate shopping list', error.message);
+  }
+});
+// GET /api/appointments/upcoming - Get upcoming appointments (next 7 days)
+app.get('/api/appointments/upcoming', authenticate, async (req, res) => {
+  try {
+    const now = new Date();
+    const nextWeek = new Date(now.getTime() + (7 * 24 * 60 * 60 * 1000));
+    
+    const appointments = await Appointment.find({
+      userId: req.user._id,
+      userEmail: req.user.email,
+      date: { $gte: now, $lte: nextWeek },
+      status: { $in: ['confirmed', 'pending'] },
+      isActive: true
+    }).sort({ date: 1, time: 1 }).limit(10);
+    
+    res.json({ success: true, appointments });
+  } catch (err) {
+    console.error('Get upcoming appointments error:', err);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+
+// Helper function to format phone number (you can customize this based on your needs)
+
+console.log('Appointment scheduling API routes loaded successfully');
+
+
+
+}; 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
