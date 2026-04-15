@@ -3922,3 +3922,5 @@ console.log('Appointment scheduling API routes loaded successfully');
  
  
  
+
+// minor tweak for clarity
