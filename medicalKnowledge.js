@@ -4,7 +4,7 @@
  * Sources: WHO, NIH, Mayo Clinic, FDA, PubMed
  */
 
-// â”€â”€â”€ DRUG/SUPPLEMENT INTERACTIONS DATABASE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── DRUG/SUPPLEMENT INTERACTIONS DATABASE ────────────────────────
 const SUPPLEMENT_INTERACTIONS = [
   // Vitamin interactions
   { pair: ['Vitamin K', 'Warfarin'], severity: 'Severe', description: 'Vitamin K counteracts Warfarin\'s blood-thinning effect', recommendation: 'Monitor INR closely. Consult doctor before taking Vitamin K supplements.' },
@@ -53,7 +53,7 @@ const SUPPLEMENT_INTERACTIONS = [
   { pair: ['Biotin', 'Lab Tests'], severity: 'Moderate', description: 'High biotin can falsify thyroid, cardiac, and hormone lab results', recommendation: 'Stop biotin 72 hours before blood tests.' },
 ];
 
-// â”€â”€â”€ SYMPTOM â†’ CONDITION MAPPING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── SYMPTOM → CONDITION MAPPING ──────────────────────────────────
 const SYMPTOM_CONDITIONS = [
   {
     symptoms: ['headache', 'fever', 'body ache', 'fatigue', 'chills'],
@@ -211,7 +211,7 @@ const SYMPTOM_CONDITIONS = [
   },
 ];
 
-// â”€â”€â”€ SYMPTOM â†’ SPECIALTY ROUTING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── SYMPTOM → SPECIALTY ROUTING ──────────────────────────────────
 const SPECIALTY_ROUTING = {
   'General Practice': ['fever', 'cold', 'cough', 'flu', 'fatigue', 'general pain', 'sore throat', 'ear pain', 'minor injury'],
   'Cardiology': ['chest pain', 'heart palpitations', 'rapid heartbeat', 'shortness of breath', 'high blood pressure', 'swollen legs', 'dizziness with exertion'],
@@ -227,7 +227,7 @@ const SPECIALTY_ROUTING = {
   'Urology': ['urinary problems', 'kidney stones', 'blood in urine', 'prostate issues', 'urinary incontinence', 'bladder problems'],
 };
 
-// â”€â”€â”€ ORGAN â†’ RISK FACTOR MAPPING (for Body Insights) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── ORGAN → RISK FACTOR MAPPING (for Body Insights) ────────────
 const ORGAN_RISK_FACTORS = {
   heart: {
     name: 'Heart',
@@ -301,7 +301,7 @@ const ORGAN_RISK_FACTORS = {
   },
 };
 
-// â”€â”€â”€ BMI RISK THRESHOLDS (WHO) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── BMI RISK THRESHOLDS (WHO) ────────────────────────────────────
 const BMI_CATEGORIES = {
   underweight: { min: 0, max: 18.5, risk: 'moderate', label: 'Underweight', color: '#60a5fa', risks: ['Nutrient deficiency', 'Weakened immune system', 'Osteoporosis risk'] },
   normal: { min: 18.5, max: 25, risk: 'low', label: 'Normal Weight', color: '#34d399', risks: ['Maintain current lifestyle'] },
@@ -311,7 +311,7 @@ const BMI_CATEGORIES = {
   obese3: { min: 40, max: 100, risk: 'critical', label: 'Obese Class III', color: '#dc2626', risks: ['Life-threatening cardiovascular events', 'Multiple organ stress', 'Severely reduced life expectancy'] },
 };
 
-// â”€â”€â”€ HEALTH RECOMMENDATIONS BY CATEGORY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── HEALTH RECOMMENDATIONS BY CATEGORY ───────────────────────────
 const HEALTH_RECOMMENDATIONS = {
   sleep: {
     low: ['Establish a consistent sleep schedule', 'Avoid screens 1 hour before bed', 'Create a dark, cool sleeping environment', 'Limit caffeine after 2 PM'],
@@ -336,7 +336,7 @@ const HEALTH_RECOMMENDATIONS = {
   }
 };
 
-// â”€â”€â”€ URGENCY LEVEL DEFINITIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── URGENCY LEVEL DEFINITIONS ────────────────────────────────────
 const URGENCY_LEVELS = {
   low: { label: 'Low Urgency', color: '#34d399', emoji: '🟢', action: 'Schedule a routine appointment within 1-2 weeks' },
   medium: { label: 'Moderate Urgency', color: '#fbbf24', emoji: '🟡', action: 'See a doctor within 2-3 days' },
@@ -344,7 +344,7 @@ const URGENCY_LEVELS = {
   emergency: { label: 'Emergency', color: '#ef4444', emoji: '🔴', action: 'Call emergency services (911) or go to ER immediately' },
 };
 
-// â”€â”€â”€ HELPER FUNCTIONS â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ─── HELPER FUNCTIONS ─────────────────────────────────────────────
 
 /**
  * Find supplement interactions for a given pair

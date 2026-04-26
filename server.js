@@ -2979,7 +2979,7 @@ app.get('/api/check-reminders', authenticate, async (req, res) => {
     const todayWater = await WaterIntakeLog.findOne({ userId: req.user._id, timestamp: { $gte: todayStart } });
     const waterDismissedToday = await ReminderDismissal.findOne({ userId: req.user._id, reminderType: 'water', dismissedAt: { $gte: todayStart } });
     if (!todayWater && !waterDismissedToday) {
-      reminders.push({ type: 'water', priority: 2, message: "You haven't logged any water today! ðŸ’§", icon: 'droplet' });
+      reminders.push({ type: 'water', priority: 2, message: "You haven't logged any water today! 💧", icon: 'droplet' });
     }
 
     // Check sleep - every 3 days
@@ -2987,7 +2987,7 @@ app.get('/api/check-reminders', authenticate, async (req, res) => {
     const sleepDaysSince = lastSleep ? Math.floor((now - new Date(lastSleep.recordedAt)) / (1000 * 60 * 60 * 24)) : 999;
     const sleepDismissedToday = await ReminderDismissal.findOne({ userId: req.user._id, reminderType: 'sleep', dismissedAt: { $gte: todayStart } });
     if (sleepDaysSince >= 3 && !sleepDismissedToday) {
-      reminders.push({ type: 'sleep', priority: 3, message: `How's your sleep? Last logged ${sleepDaysSince} days ago ðŸŒ™`, daysSince: sleepDaysSince, icon: 'moon' });
+      reminders.push({ type: 'sleep', priority: 3, message: `How's your sleep? Last logged ${sleepDaysSince} days ago 🌙`, daysSince: sleepDaysSince, icon: 'moon' });
     }
 
     // Check mood - daily
@@ -2995,7 +2995,7 @@ app.get('/api/check-reminders', authenticate, async (req, res) => {
     const moodLoggedToday = lastMood && new Date(lastMood.recordedAt) >= todayStart;
     const moodDismissedToday = await ReminderDismissal.findOne({ userId: req.user._id, reminderType: 'mood', dismissedAt: { $gte: todayStart } });
     if (!moodLoggedToday && !moodDismissedToday) {
-      reminders.push({ type: 'mood', priority: 4, message: "How are you feeling today? ðŸ˜Š", icon: 'smile' });
+      reminders.push({ type: 'mood', priority: 4, message: "How are you feeling today? 😊", icon: 'smile' });
     }
 
     // Sort by priority
@@ -3245,7 +3245,7 @@ app.get('/api/sessions/context', authenticate, async (req, res) => {
       mealQuestion = 'Had your breakfast yet?';
     } else if (hour >= 11 && hour < 14) {
       greetingType = 'midday';
-      greetingEmoji = 'ðŸ½ï¸';
+      greetingEmoji = '🍽️';
       expectedMeal = 'lunch';
       mealQuestion = 'Lunch time! Did you eat?';
     } else if (hour >= 14 && hour < 17) {
@@ -3260,7 +3260,7 @@ app.get('/api/sessions/context', authenticate, async (req, res) => {
       mealQuestion = 'Had your dinner?';
     } else {
       greetingType = 'night';
-      greetingEmoji = 'ðŸŒ™';
+      greetingEmoji = '🌙';
       expectedMeal = null;
       mealQuestion = 'Time to wind down and rest!';
     }
