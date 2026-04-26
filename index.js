@@ -1,4 +1,4 @@
-﻿module.exports = (app, mongoose, authenticate) => {
+module.exports = (app, mongoose, authenticate) => {
     const standardErrorResponse = (res, statusCode, message, details = null) => {
   const response = {
     success: false,
@@ -3891,37 +3891,4 @@ console.log('Appointment scheduling API routes loaded successfully');
 
 
 
-}; 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-
-
-// minor tweak for clarity
+};

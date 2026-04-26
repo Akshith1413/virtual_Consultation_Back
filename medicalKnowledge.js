@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Medical Knowledge Base
  * Comprehensive healthcare data for AI features
  * Sources: WHO, NIH, Mayo Clinic, FDA, PubMed
@@ -502,48 +502,3 @@ module.exports = {
   getBMICategory,
   calculateOrganRisk
 };
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-
-// minor tweak for clarity
-
-// minor tweak for clarity
-
-// minor tweak for clarity
-
-
-// minor tweak for clarity
-
-// minor tweak for clarity
-
-// minor tweak for clarity
-

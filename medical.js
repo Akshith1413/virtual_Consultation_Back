@@ -1,4 +1,4 @@
-﻿module.exports = (app, mongoose, authenticate) => {
+module.exports = (app, mongoose, authenticate) => {
 
 // Medical Support Schema
 const MedicalSupportSchema = new mongoose.Schema({
@@ -234,50 +234,4 @@ app.get("/api/virtual-consultation", async (req, res) => {
   }
 });
 
-}; 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-
-// minor tweak for clarity
-
-// minor tweak for clarity
-
-
-// minor tweak for clarity
+};
