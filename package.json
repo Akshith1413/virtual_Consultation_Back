@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "healthback",
   "version": "1.0.0",
   "main": "server.js",
@@ -32,44 +32,3 @@
     "node-fetch": "^3.3.2"
   }
 }
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
- 
-
-// minor tweak for clarity
-
-// minor tweak for clarity
-
-// minor tweak for clarity
