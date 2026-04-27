@@ -1,4 +1,5 @@
 require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
@@ -7,6 +8,9 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const { body, validationResult } = require('express-validator');
+const cron = require('node-cron');
+const https = require('https');
+const http = require('http');
 
 const app = express();
 
@@ -226,7 +230,7 @@ const seedCommunities = async () => {
     await Group.insertMany(initialGroups);
     console.log('✅ Realistic communities seeded successfully');
   } catch (err) {
-    console.error('âŒ Seeding error:', err);
+    console.error('â Œ Seeding error:', err);
   }
 };
 
@@ -3240,7 +3244,7 @@ app.get('/api/sessions/context', authenticate, async (req, res) => {
     let greetingType, expectedMeal, greetingEmoji, mealQuestion;
     if (hour >= 5 && hour < 11) {
       greetingType = 'morning';
-      greetingEmoji = 'â˜€ï¸';
+      greetingEmoji = 'â˜€ï¸ ';
       expectedMeal = 'breakfast';
       mealQuestion = 'Had your breakfast yet?';
     } else if (hour >= 11 && hour < 14) {
@@ -3517,8 +3521,33 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something broke!' });
 });
 
-// Start server
 const PORT = process.env.PORT || 3000;
+
+// Ping endpoint to keep server awake
+app.get('/api/ping', (req, res) => {
+  res.status(200).json({ message: 'Pong', timestamp: new Date() });
+});
+
+// Cron job to prevent Render cold start
+// Runs every 14 minutes
+cron.schedule('*/14 * * * *', () => {
+  const backendUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+  console.log(`Pinging backend to prevent cold start: ${backendUrl}`);
+  
+  const requestModule = backendUrl.startsWith('https') ? https : http;
+  
+  requestModule.get(`${backendUrl}/api/ping`, (res) => {
+    if (res.statusCode === 200) {
+      console.log('Backend ping successful');
+    } else {
+      console.error(`Backend ping failed with status code: ${res.statusCode}`);
+    }
+  }).on('error', (err) => {
+    console.error('Error pinging backend:', err.message);
+  });
+});
+
+// Start server
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });
